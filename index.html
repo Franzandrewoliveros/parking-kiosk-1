@@ -11,7 +11,7 @@
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
-        /* --- LOGIN & KIOSK BACKGROUND --- */
+        /* --- BACKGROUNDS --- */
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
@@ -53,9 +53,10 @@
         /* --- KIOSK OVERLAY --- */
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
-        .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
+        .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; transition: 0.3s; }
+        .kiosk-input.success { border-color: #4caf50; background: #e8f5e9; }
 
-        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; left: 0; width: 100%; text-align: center; font-family: monospace; } }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
     </style>
 </head>
 <body>
@@ -81,7 +82,7 @@
         <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
         <br>
         <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">CHECK-IN</button>
-        <div id="kiosk-status" style="margin-top:20px; font-size: 2rem;"></div>
+        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold; height: 60px;"></div>
     </div>
 </div>
 
@@ -149,54 +150,64 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    window.login = () => {
-        if(document.getElementById('pass').value === "0526") {
-            document.getElementById('login-overlay').style.display = 'none';
-        } else { alert("Access Denied"); }
-    };
-
+    window.login = () => { if(document.getElementById('pass').value === "0526") { document.getElementById('login-overlay').style.display = 'none'; } else { alert("Access Denied"); } };
     window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
     window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
     setInterval(() => { const clock = document.getElementById('clock'); if(clock) clock.innerText = new Date().toLocaleString(); }, 1000);
 
+    // --- UPDATED CHECK-IN WITH FEEDBACK ---
     window.kioskCheckIn = async () => {
         const pInput = document.getElementById('kioskPlate');
+        const feedback = document.getElementById('kiosk-feedback');
         const plate = pInput.value.trim().toUpperCase();
-        if(!plate) return;
+        
+        if(!plate) {
+            feedback.innerHTML = "<span style='color: #ffeb3b;'>⚠️ PLEASE ENTER PLATE</span>";
+            setTimeout(() => { feedback.innerHTML = ""; }, 2000);
+            return;
+        }
+
         try {
             await setDoc(doc(db, "active_parking", plate), {
                 plate: plate, entryTime: new Date().toLocaleTimeString(),
                 rawIn: Date.now(), date: new Date().toLocaleDateString(), status: "PARKED"
             });
+            
+            // Success Indicators
+            feedback.innerHTML = "<span style='color: #4caf50;'>✅ CHECK-IN SUCCESSFUL!</span>";
+            pInput.classList.add('success');
             pInput.value = ""; 
-        } catch (e) { alert("Error"); }
+
+            // Clear indicators after 3 seconds
+            setTimeout(() => { 
+                feedback.innerHTML = ""; 
+                pInput.classList.remove('success');
+            }, 3000);
+
+        } catch (e) { 
+            feedback.innerHTML = "<span style='color: red;'>❌ ERROR SAVING</span>";
+        }
     };
 
     window.checkOut = async (plate) => {
         const activeSnap = await getDocs(collection(db, "active_parking"));
         const data = activeSnap.docs.find(d => d.id === plate)?.data();
         if(!data) return;
-
         const outTime = new Date().toLocaleTimeString();
-        const currentDate = new Date().toLocaleDateString();
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
         const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
-        // --- IMPROVED RECEIPT WITH TIME AND DATE ---
         document.getElementById('print-area').innerHTML = `
             <div style="border: 2px dashed #000; padding: 15px; display: inline-block;">
                 <h2 style="margin: 0;">METRO PLAZA</h2>
-                <p>Official Receipt</p>
-                <hr>
+                <p>Official Receipt</p><hr>
                 <div style="text-align: left;">
-                    <b>DATE:</b> ${currentDate}<br>
+                    <b>DATE:</b> ${new Date().toLocaleDateString()}<br>
                     <b>PLATE:</b> ${plate}<br>
                     <b>TIME IN:</b> ${data.entryTime}<br>
-                    <b>TIME OUT:</b> ${outTime}<br>
-                    <hr>
+                    <b>TIME OUT:</b> ${outTime}<hr>
                     <b style="font-size: 1.4rem;">TOTAL FEE: P${payment}.00</b>
-                </div>
-                <hr>
+                </div><hr>
                 <p>Thank You & Drive Safely!</p>
             </div>`;
         window.print();
@@ -206,8 +217,8 @@
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    window.deleteHistory = async (id) => { if(confirm("Delete this log?")) await deleteDoc(doc(db, "parking_history", id)); };
-    window.deleteSale = async (id) => { if(confirm("Delete this sale?")) await deleteDoc(doc(db, "sales_report", id)); };
+    window.deleteHistory = async (id) => { if(confirm("Delete log?")) await deleteDoc(doc(db, "parking_history", id)); };
+    window.deleteSale = async (id) => { if(confirm("Delete sale?")) await deleteDoc(doc(db, "sales_report", id)); };
 
     onSnapshot(collection(db, "active_parking"), (snap) => {
         document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
@@ -241,8 +252,6 @@
         document.getElementById(tabId).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
-        const titles = {dash:'PARKING OVERVIEW', hist:'HISTORY LOGS', sale:'SALES REPORT'};
-        document.getElementById('view-title').innerText = titles[tabId];
     };
 </script>
 </body>
