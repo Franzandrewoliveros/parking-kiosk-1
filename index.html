@@ -125,13 +125,113 @@
 <div id="print-area"></div>
 
 <script>
-    let db;
-    const request = indexedDB.open("MetroPlazaRedDB", 1);
-    request.onupgradeneeded = (e) => {
-        const d = e.target.result;
-        d.createObjectStore("active", { keyPath: "plate" });
-        d.createObjectStore("history", { autoIncrement: true });
-        d.createObjectStore("sales", { autoIncrement: true });
+    <script type="module">
+    // 1. Firebase Cloud Setup
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
+        authDomain: "metroplaza-13b5e.firebaseapp.com",
+        projectId: "metroplaza-13b5e",
+        storageBucket: "metroplaza-13b5e.firebasestorage.app",
+        messagingSenderId: "958136196486",
+        appId: "1:958136196486:web:28292dcd6cd5f2bbfae007"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // --- ADMIN & NAVIGATION ---
+    window.login = () => {
+        if(document.getElementById('pass').value === "0526") {
+            document.getElementById('login-overlay').style.display = 'none';
+        } else { alert("Access Denied"); }
+    };
+
+    window.enterKiosk = () => { 
+        document.getElementById('kiosk-view').style.display = 'flex'; 
+        document.getElementById('kioskPlate').focus();
+    };
+    
+    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
+
+    setInterval(() => { 
+        const clock = document.getElementById('clock');
+        if(clock) clock.innerText = new Date().toLocaleString(); 
+    }, 1000);
+
+    // --- CLOUD CHECK-IN ---
+    window.kioskCheckIn = async () => {
+        const pInput = document.getElementById('kioskPlate');
+        const plate = pInput.value.trim().toUpperCase();
+        if(!plate) return;
+
+        try {
+            await setDoc(doc(db, "active_parking", plate), {
+                plate: plate,
+                entryTime: new Date().toLocaleTimeString(),
+                rawIn: Date.now(),
+                date: new Date().toLocaleDateString(),
+                status: "PARKED"
+            });
+            document.getElementById('kiosk-status').innerHTML = "✅ SAVED TO CLOUD: " + plate;
+            pInput.value = ""; 
+            setTimeout(() => { document.getElementById('kiosk-status').innerText = ""; }, 3000);
+        } catch (e) { alert("Cloud Error: Check your Firebase Rules tab."); }
+    };
+
+    // --- CLOUD CHECK-OUT ---
+    window.checkOut = async (plate) => {
+        const activeSnap = await getDocs(collection(db, "active_parking"));
+        const data = activeSnap.docs.find(d => d.id === plate)?.data();
+        if(!data) return;
+
+        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
+        const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
+
+        document.getElementById('print-area').innerHTML = `
+            <div style="text-align:center; padding:20px; border:2px dashed #000;">
+                <h2>METRO PLAZA</h2><hr>
+                <b>PLATE: ${plate}</b><br>
+                FEE: P${payment}.00
+            </div>`;
+        window.print();
+
+        await addDoc(collection(db, "parking_history"), { ...data, out: new Date().toLocaleTimeString(), status: "EXITED" });
+        await addDoc(collection(db, "sales_report"), { plate, hrs: hrs + " hrs", pay: "P" + payment, date: data.date });
+        await deleteDoc(doc(db, "active_parking", plate));
+    };
+
+    // --- REAL-TIME LISTENERS ---
+    onSnapshot(collection(db, "active_parking"), (snap) => {
+        document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+        }).join('');
+    });
+
+    onSnapshot(collection(db, "parking_history"), (snap) => {
+        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>EXITED</td><td>${r.date}</td></tr>`;
+        }).reverse().join('');
+    });
+
+    onSnapshot(collection(db, "sales_report"), (snap) => {
+        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            return `<tr><td><b>${r.plate}</b></td><td>${r.hrs}</td><td style="color:red">P${r.pay}</td><td>${r.date}</td></tr>`;
+        }).reverse().join('');
+    });
+
+    window.showTab = (tabId, el) => {
+        document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
+        document.getElementById(tabId).style.display = 'block';
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+    };
+</script>
     };
     request.onsuccess = (e) => { db = e.target.result; render(); };
 
