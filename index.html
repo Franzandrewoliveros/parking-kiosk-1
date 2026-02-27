@@ -125,113 +125,473 @@
 <div id="print-area"></div>
 
 <script>
-    <script type="module">
-    // 1. Firebase Cloud Setup
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
-        authDomain: "metroplaza-13b5e.firebaseapp.com",
-        projectId: "metroplaza-13b5e",
-        storageBucket: "metroplaza-13b5e.firebasestorage.app",
-        messagingSenderId: "958136196486",
-        appId: "1:958136196486:web:28292dcd6cd5f2bbfae007"
+    let db;
+    const request = indexedDB.open("MetroPlazaRedDB", 1);
+    request.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        d.createObjectStore("active", { keyPath: "plate" });
+        d.createObjectStore("history", { autoIncrement: true });
+        d.createObjectStore("sales", { autoIncrement: true });
     };
+    request.onsuccess = (e) => { db = e.target.result; render(); };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 
-    // --- ADMIN & NAVIGATION ---
-    window.login = () => {
+    // Initial Login
+    function login() {
         if(document.getElementById('pass').value === "0526") {
             document.getElementById('login-overlay').style.display = 'none';
         } else { alert("Access Denied"); }
-    };
+    }
 
-    window.enterKiosk = () => { 
+    // Switch to Kiosk
+    function enterKiosk() { 
         document.getElementById('kiosk-view').style.display = 'flex'; 
         document.getElementById('kioskPlate').focus();
-    };
-    
-    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
+    }
 
-    setInterval(() => { 
-        const clock = document.getElementById('clock');
-        if(clock) clock.innerText = new Date().toLocaleString(); 
-    }, 1000);
+    // Switch back to Admin (NO PASSWORD REQUIRED)
+    function exitKiosk() { 
+        document.getElementById('kiosk-view').style.display = 'none'; 
+    }
 
-    // --- CLOUD CHECK-IN ---
-    window.kioskCheckIn = async () => {
+    function kioskCheckIn() {
         const pInput = document.getElementById('kioskPlate');
         const plate = pInput.value.trim().toUpperCase();
         if(!plate) return;
 
-        try {
-            await setDoc(doc(db, "active_parking", plate), {
-                plate: plate,
-                entryTime: new Date().toLocaleTimeString(),
-                rawIn: Date.now(),
-                date: new Date().toLocaleDateString(),
-                status: "PARKED"
-            });
-            document.getElementById('kiosk-status').innerHTML = "✅ SAVED TO CLOUD: " + plate;
-            pInput.value = ""; 
+        const data = {
+            plate: plate, entryTime: new Date().toLocaleTimeString(),
+            rawIn: new Date().getTime(), date: new Date().toLocaleDateString(), status: "PARKED"
+        };
+
+        const tx = db.transaction("active", "readwrite");
+        const req = tx.objectStore("active").add(data);
+        req.onsuccess = () => {
+            document.getElementById('kiosk-status').innerHTML = "✅ SUCCESS: " + plate;
+            pInput.value = ""; render();
             setTimeout(() => { document.getElementById('kiosk-status').innerText = ""; }, 3000);
-        } catch (e) { alert("Cloud Error: Check your Firebase Rules tab."); }
-    };
+        };
+        req.onerror = () => { document.getElementById('kiosk-status').innerText = "❌ ALREADY IN SYSTEM"; };
+    }
 
-    // --- CLOUD CHECK-OUT ---
-    window.checkOut = async (plate) => {
-        const activeSnap = await getDocs(collection(db, "active_parking"));
-        const data = activeSnap.docs.find(d => d.id === plate)?.data();
-        if(!data) return;
+    function checkOut(plate) {
+        const tx = db.transaction(["active", "history", "sales"], "readwrite");
+        tx.objectStore("active").get(plate).onsuccess = (e) => {
+            const data = e.target.result;
+            const hrs = Math.ceil((new Date().getTime() - data.rawIn) / (1000 * 60 * 60));
+            const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
-        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
+            document.getElementById('print-area').innerHTML = `
+                <div style="text-align:center; padding:20px; border:2px dashed #000;">
+                    <h2>METRO PLAZA</h2>
+                    <p>Bagong Silang</p><hr>
+                    <b>PLATE: ${plate}</b><br>
+                    TIME IN: ${data.entryTime}<br>
+                    TIME OUT: ${new Date().toLocaleTimeString()}<br>
+                    <h3>FEE: P${payment}.00</h3>
+                </div>`;
+            window.print();
 
-        document.getElementById('print-area').innerHTML = `
-            <div style="text-align:center; padding:20px; border:2px dashed #000;">
-                <h2>METRO PLAZA</h2><hr>
-                <b>PLATE: ${plate}</b><br>
-                FEE: P${payment}.00
-            </div>`;
-        window.print();
+            tx.objectStore("history").add({...data, out: new Date().toLocaleTimeString(), status: "UNPARKED"});
+            tx.objectStore("sales").add({plate: plate, hrs: hrs + " hrs", pay: "P" + payment, date: data.date});
+            tx.objectStore("active").delete(plate);
+        };
+        tx.oncomplete = () => render();
+    }
 
-        await addDoc(collection(db, "parking_history"), { ...data, out: new Date().toLocaleTimeString(), status: "EXITED" });
-        await addDoc(collection(db, "sales_report"), { plate, hrs: hrs + " hrs", pay: "P" + payment, date: data.date });
-        await deleteDoc(doc(db, "active_parking", plate));
-    };
-
-    // --- REAL-TIME LISTENERS ---
-    onSnapshot(collection(db, "active_parking"), (snap) => {
-        document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
-        }).join('');
-    });
-
-    onSnapshot(collection(db, "parking_history"), (snap) => {
-        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>EXITED</td><td>${r.date}</td></tr>`;
-        }).reverse().join('');
-    });
-
-    onSnapshot(collection(db, "sales_report"), (snap) => {
-        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            return `<tr><td><b>${r.plate}</b></td><td>${r.hrs}</td><td style="color:red">P${r.pay}</td><td>${r.date}</td></tr>`;
-        }).reverse().join('');
-    });
-
-    window.showTab = (tabId, el) => {
+    function showTab(tabId, el) {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(tabId).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
-    };
+        const titles = {dash:'PARKING OVERVIEW', hist:'HISTORY LOGS', sale:'SALES REPORT'};
+        document.getElementById('view-title').innerText = titles[tabId];
+    }
+
+    function render() {
+        if(!db) return;
+        db.transaction("active").objectStore("active").getAll().onsuccess = (e) => {
+            document.getElementById('table-dash').innerHTML = e.target.result.map(r => `
+                <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.entryTime}</td>
+                <td><span style="color:green; font-weight:bold;">● PARKED</span></td><td>${r.date}</td>
+                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`).join('');
+        };
+        db.transaction("history").objectStore("history").getAll().onsuccess = (e) => {
+            document.getElementById('table-hist').innerHTML = e.target.result.reverse().map(r => `
+                <tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td style="color:red;">EXITED</td><td>${r.date}</td></tr>`).join('');
+        };
+        db.transaction("sales").objectStore("sales").getAll().onsuccess = (e) => {
+            document.getElementById('table-sale').innerHTML = e.target.result.reverse().map(r => `
+                <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.hrs}</td><td style="color:var(--red-main); font-weight:bold;">${r.pay}</td><td>${r.date}</td></tr>`).join('');
+        };
+    }
 </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Metro Plaza Bagong Silang - Management System</title>
+    <style>
+        :root { 
+            --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
+            --glass: rgba(255, 255, 255, 0.95); --text-light: #f5f5f5;
+        }
+        
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
+
+        /* --- BACKGROUNDS --- */
+        .parking-bg {
+            position: fixed; inset: 0; z-index: 2500;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+                        url('https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2000');
+            background-size: cover; background-position: center;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* --- LOGIN CARD --- */
+        .glass-card { 
+            background: var(--glass); padding: 40px; border-radius: 20px; 
+            width: 380px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border-top: 5px solid var(--red-main);
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar { width: 280px; background: var(--dark-bg); color: white; display: flex; flex-direction: column; z-index: 10; }
+        .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
+        .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; }
+        .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
+
+        /* --- MAIN CONTENT --- */
+        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        
+        /* --- TABLES --- */
+        .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; }
+        td { padding: 15px; border-bottom: 1px solid #eee; }
+        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+
+        /* --- KIOSK OVERLAY --- */
+        #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
+        .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
+        .kiosk-input { 
+            font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; 
+            border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px;
+        }
+
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay" class="parking-bg">
+    <div class="glass-card">
+        <h1 style="color:var(--red-main); margin:0;">METRO PLAZA</h1>
+        <p style="margin-bottom:30px; color:#555; font-weight: bold;">ADMIN ACCESS</p>
+        <input type="password" id="pass" placeholder="Enter Access Code" 
+               style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; box-sizing: border-box; text-align: center; font-size: 1.1rem;">
+        <button onclick="login()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">SECURE LOGIN</button>
+    </div>
+</div>
+
+<div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
+    <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
+        <span style="font-weight: bold; color: var(--red-main);">METRO PLAZA KIOSK</span>
+        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; cursor:pointer; border-radius:5px; padding: 8px 15px; font-weight: bold;">← BACK TO ADMIN</button>
+    </div>
+    <div style="text-align:center; color:white;">
+        <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
+        <p style="font-size: 1.5rem; color: #ccc;">Enter Plate Number</p>
+        <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
+        <br>
+        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">CHECK-IN</button>
+        <div id="kiosk-status" style="margin-top:20px; font-size: 2rem;"></div>
+    </div>
+</div>
+
+<div id="sidebar">
+    <div class="sidebar-brand">
+        <h2 style="margin:0;">METRO PLAZA</h2>
+        <small>MANAGEMENT SYSTEM</small>
+    </div>
+    <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
+    <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
+    <div class="nav-item" onclick="showTab('sale', this)">💰 SALES REPORT</div>
+    <div class="nav-item" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
+    <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
+</div>
+
+<div id="main-content">
+    <div class="header-bar">
+        <h2 id="view-title" style="color:#333;">PARKING OVERVIEW</h2>
+        <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
+    </div>
+
+    <div id="dash" class="tab-view table-container">
+        <table>
+            <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <tbody id="table-dash"></tbody>
+        </table>
+    </div>
+
+    <div id="hist" class="tab-view table-container" style="display:none">
+        <table>
+            <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>STATUS</th><th>DATE</th></tr></thead>
+            <tbody id="table-hist"></tbody>
+        </table>
+    </div>
+
+    <div id="sale" class="tab-view table-container" style="display:none">
+        <table>
+            <thead><tr><th>PLATE</th><th>STAY</th><th>TOTAL FEE</th><th>DATE</th></tr></thead>
+            <tbody id="table-sale"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="print-area"></div>
+
+<script>
+    let db;
+    const request = indexedDB.open("MetroPlazaRedDB", 1);
+    request.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        d.createObjectStore("active", { keyPath: "plate" });
+        d.createObjectStore("history", { autoIncrement: true });
+        d.createObjectStore("sales", { autoIncrement: true });
+    };
+    request.onsuccess = (e) => { db = e.target.result; render(); };
+
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+
+    // Initial Login
+    function login() {
+        if(document.getElementById('pass').value === "0526") {
+            document.getElementById('login-overlay').style.display = 'none';
+        } else { alert("Access Denied"); }
+    }
+
+    // Switch to Kiosk
+    function enterKiosk() { 
+        document.getElementById('kiosk-view').style.display = 'flex'; 
+        document.getElementById('kioskPlate').focus();
+    }
+
+    // Switch back to Admin (NO PASSWORD REQUIRED)
+    function exitKiosk() { 
+        document.getElementById('kiosk-view').style.display = 'none'; 
+    }
+
+    function kioskCheckIn() {
+        const pInput = document.getElementById('kioskPlate');
+        const plate = pInput.value.trim().toUpperCase();
+        if(!plate) return;
+
+        const data = {
+            plate: plate, entryTime: new Date().toLocaleTimeString(),
+            rawIn: new Date().getTime(), date: new Date().toLocaleDateString(), status: "PARKED"
+        };
+
+        const tx = db.transaction("active", "readwrite");
+        const req = tx.objectStore("active").add(data);
+        req.onsuccess = () => {
+            document.getElementById('kiosk-status').innerHTML = "✅ SUCCESS: " + plate;
+            pInput.value = ""; render();
+            setTimeout(() => { document.getElementById('kiosk-status').innerText = ""; }, 3000);
+        };
+        req.onerror = () => { document.getElementById('kiosk-status').innerText = "❌ ALREADY IN SYSTEM"; };
+    }
+
+    function checkOut(plate) {
+        const tx = db.transaction(["active", "history", "sales"], "readwrite");
+        tx.objectStore("active").get(plate).onsuccess = (e) => {
+            const data = e.target.result;
+            const hrs = Math.ceil((new Date().getTime() - data.rawIn) / (1000 * 60 * 60));
+            const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
+
+            document.getElementById('print-area').innerHTML = `
+                <div style="text-align:center; padding:20px; border:2px dashed #000;">
+                    <h2>METRO PLAZA</h2>
+                    <p>Bagong Silang</p><hr>
+                    <b>PLATE: ${plate}</b><br>
+                    TIME IN: ${data.entryTime}<br>
+                    TIME OUT: ${new Date().toLocaleTimeString()}<br>
+                    <h3>FEE: P${payment}.00</h3>
+                </div>`;
+            window.print();
+
+            tx.objectStore("history").add({...data, out: new Date().toLocaleTimeString(), status: "UNPARKED"});
+            tx.objectStore("sales").add({plate: plate, hrs: hrs + " hrs", pay: "P" + payment, date: data.date});
+            tx.objectStore("active").delete(plate);
+        };
+        tx.oncomplete = () => render();
+    }
+
+    function showTab(tabId, el) {
+        document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
+        document.getElementById(tabId).style.display = 'block';
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        const titles = {dash:'PARKING OVERVIEW', hist:'HISTORY LOGS', sale:'SALES REPORT'};
+        document.getElementById('view-title').innerText = titles[tabId];
+    }
+
+    function render() {
+        if(!db) return;
+        db.transaction("active").objectStore("active").getAll().onsuccess = (e) => {
+            document.getElementById('table-dash').innerHTML = e.target.result.map(r => `
+                <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.entryTime}</td>
+                <td><span style="color:green; font-weight:bold;">● PARKED</span></td><td>${r.date}</td>
+                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`).join('');
+        };
+        db.transaction("history").objectStore("history").getAll().onsuccess = (e) => {
+            document.getElementById('table-hist').innerHTML = e.target.result.reverse().map(r => `
+                <tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td style="color:red;">EXITED</td><td>${r.date}</td></tr>`).join('');
+        };
+        db.transaction("sales").objectStore("sales").getAll().onsuccess = (e) => {
+            document.getElementById('table-sale').innerHTML = e.target.result.reverse().map(r => `
+                <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.hrs}</td><td style="color:var(--red-main); font-weight:bold;">${r.pay}</td><td>${r.date}</td></tr>`).join('');
+        };
+    }
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Metro Plaza Bagong Silang - Management System</title>
+    <style>
+        :root { 
+            --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
+            --glass: rgba(255, 255, 255, 0.95); --text-light: #f5f5f5;
+        }
+        
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
+
+        /* --- BACKGROUNDS --- */
+        .parking-bg {
+            position: fixed; inset: 0; z-index: 2500;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+                        url('https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2000');
+            background-size: cover; background-position: center;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* --- LOGIN CARD --- */
+        .glass-card { 
+            background: var(--glass); padding: 40px; border-radius: 20px; 
+            width: 380px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border-top: 5px solid var(--red-main);
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar { width: 280px; background: var(--dark-bg); color: white; display: flex; flex-direction: column; z-index: 10; }
+        .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
+        .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; }
+        .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
+
+        /* --- MAIN CONTENT --- */
+        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        
+        /* --- TABLES --- */
+        .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; }
+        td { padding: 15px; border-bottom: 1px solid #eee; }
+        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+
+        /* --- KIOSK OVERLAY --- */
+        #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
+        .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
+        .kiosk-input { 
+            font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; 
+            border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px;
+        }
+
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay" class="parking-bg">
+    <div class="glass-card">
+        <h1 style="color:var(--red-main); margin:0;">METRO PLAZA</h1>
+        <p style="margin-bottom:30px; color:#555; font-weight: bold;">ADMIN ACCESS</p>
+        <input type="password" id="pass" placeholder="Enter Access Code" 
+               style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; box-sizing: border-box; text-align: center; font-size: 1.1rem;">
+        <button onclick="login()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">SECURE LOGIN</button>
+    </div>
+</div>
+
+<div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
+    <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
+        <span style="font-weight: bold; color: var(--red-main);">METRO PLAZA KIOSK</span>
+        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; cursor:pointer; border-radius:5px; padding: 8px 15px; font-weight: bold;">← BACK TO ADMIN</button>
+    </div>
+    <div style="text-align:center; color:white;">
+        <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
+        <p style="font-size: 1.5rem; color: #ccc;">Enter Plate Number</p>
+        <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
+        <br>
+        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">CHECK-IN</button>
+        <div id="kiosk-status" style="margin-top:20px; font-size: 2rem;"></div>
+    </div>
+</div>
+
+<div id="sidebar">
+    <div class="sidebar-brand">
+        <h2 style="margin:0;">METRO PLAZA</h2>
+        <small>MANAGEMENT SYSTEM</small>
+    </div>
+    <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
+    <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
+    <div class="nav-item" onclick="showTab('sale', this)">💰 SALES REPORT</div>
+    <div class="nav-item" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
+    <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
+</div>
+
+<div id="main-content">
+    <div class="header-bar">
+        <h2 id="view-title" style="color:#333;">PARKING OVERVIEW</h2>
+        <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
+    </div>
+
+    <div id="dash" class="tab-view table-container">
+        <table>
+            <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <tbody id="table-dash"></tbody>
+        </table>
+    </div>
+
+    <div id="hist" class="tab-view table-container" style="display:none">
+        <table>
+            <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>STATUS</th><th>DATE</th></tr></thead>
+            <tbody id="table-hist"></tbody>
+        </table>
+    </div>
+
+    <div id="sale" class="tab-view table-container" style="display:none">
+        <table>
+            <thead><tr><th>PLATE</th><th>STAY</th><th>TOTAL FEE</th><th>DATE</th></tr></thead>
+            <tbody id="table-sale"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="print-area"></div>
+
+<script>
+    let db;
+    const request = indexedDB.open("MetroPlazaRedDB", 1);
+    request.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        d.createObjectStore("active", { keyPath: "plate" });
+        d.createObjectStore("history", { autoIncrement: true });
+        d.createObjectStore("sales", { autoIncrement: true });
     };
     request.onsuccess = (e) => { db = e.target.result; render(); };
 
