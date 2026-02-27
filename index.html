@@ -1,200 +1,167 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin - Parking Management</title>
+    <title>Motorcycle Parking System - Persistent</title>
     <style>
-        :root { --sidebar-width: 200px; --primary: #1a73e8; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f8f9fa; }
+        :root { --primary: #1a73e8; --sidebar: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f8f9fa; height: 100vh; }
         
-        /* Sidebar Styles */
-        #sidebar { width: var(--sidebar-width); background: #2c3e50; color: white; height: 100vh; position: fixed; padding: 20px 0; }
-        #sidebar h2 { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #3e4f5f; padding-bottom: 10px; }
-        .nav-item { padding: 15px 25px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; }
-        .nav-item:hover, .nav-item.active { background: #34495e; border-left: 4px solid var(--primary); }
-        .logout { position: absolute; bottom: 20px; width: 100%; color: #ff4757; font-weight: bold; cursor: pointer; text-align: center; }
+        /* Sidebar Styles from ADMIN.pdf */
+        #sidebar { width: 220px; background: var(--sidebar); color: white; display: flex; flex-direction: column; }
+        .nav-item { padding: 18px 25px; cursor: pointer; border-bottom: 1px solid #34495e; transition: 0.3s; }
+        .nav-item:hover, .nav-item.active { background: #34495e; border-left: 5px solid var(--primary); }
+        .logout { margin-top: auto; padding: 20px; color: #ff4757; text-align: center; cursor: pointer; font-weight: bold; border-top: 1px solid #34495e; }
 
-        /* Main Content */
-        #main { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); padding: 30px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        /* Main Content Area */
+        #main { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
         .view { display: none; }
         .view.active { display: block; }
 
-        /* Tables & UI Elements */
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        /* Table & Form Styles */
+        .kiosk-form { background: white; padding: 20px; border-radius: 8px; display: flex; gap: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 4px; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f1f3f4; color: #5f6368; text-transform: uppercase; font-size: 0.85rem; }
+        th { background: #f1f3f4; color: #666; font-size: 12px; }
         .status-parked { color: #28a745; font-weight: bold; }
         .status-unparked { color: #dc3545; font-weight: bold; }
-        
-        .kiosk-entry { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; border: 1px solid #ddd; }
-        input { padding: 12px; border: 1px solid #ddd; border-radius: 5px; flex-grow: 1; text-transform: uppercase; font-size: 1rem; }
-        .btn { padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-checkin { background: var(--primary); color: white; }
-        .btn-checkout { background: #dc3545; color: white; padding: 5px 10px; font-size: 0.8rem; }
+        .btn-blue { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 
-        /* Print Style */
-        @media print {
-            body * { visibility: hidden; }
-            #receipt-box, #receipt-box * { visibility: visible; }
-            #receipt-box { position: absolute; top: 0; left: 0; width: 100%; text-align: center; }
-        }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top:0; width: 100%; text-align: center; } }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
-    <h2>ADMIN</h2>
-    <div class="nav-item active" onclick="showView('dashboard')">DASHBOARD</div>
-    <div class="nav-item" onclick="showView('history')">HISTORY</div>
-    <div class="nav-item" onclick="showView('sales')">SALES</div>
-    <div class="logout">LOG OUT</div>
+    <div style="padding: 25px; font-weight: bold; font-size: 1.2rem;">ADMIN</div>
+    <div class="nav-item active" onclick="showView('dash')">8 DASH BOARD</div>
+    <div class="nav-item" onclick="showView('hist')">HISTORY</div>
+    <div class="nav-item" onclick="showView('sale')">SALES</div>
+    <div class="logout" onclick="location.reload()">LOG OUT</div>
 </div>
 
 <div id="main">
     <div class="header">
         <h2 id="view-title">PARKING OVERVIEW</h2>
-        <span>WELCOME, ADMIN</span>
+        <div style="font-weight: bold; color: #555;">WELCOME, ADMIN</div>
     </div>
 
-    <div id="dashboard" class="view active">
-        <div class="kiosk-entry">
-            <input type="text" id="plateInput" placeholder="ENTER PLATE NUMBER (e.g. ABC123)">
-            <button class="btn btn-checkin" onclick="checkIn()">CHECK-IN</button>
+    <div id="view-dash" class="view active">
+        <div class="kiosk-form">
+            <input type="text" id="plateInput" placeholder="ENTER PLATE NUMBER (E.G. ABC123)">
+            <button class="btn-blue" onclick="checkIn()">CHECK-IN</button>
         </div>
         <table>
-            <thead>
-                <tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr>
-            </thead>
-            <tbody id="dashboard-table"></tbody>
+            <thead><tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <tbody id="table-dash"></tbody>
         </table>
     </div>
 
-    <div id="history" class="view">
+    <div id="view-hist" class="view">
         <table>
-            <thead>
-                <tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th></tr>
-            </thead>
-            <tbody id="history-table"></tbody>
+            <thead><tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th></tr></thead>
+            <tbody id="table-hist"></tbody>
         </table>
     </div>
 
-    <div id="sales" class="view">
+    <div id="view-sale" class="view">
         <table>
-            <thead>
-                <tr><th>PLATE NUMBER</th><th>HOURS</th><th>PAYMENT</th><th>DATE</th></tr>
-            </thead>
-            <tbody id="sales-table"></tbody>
+            <thead><tr><th>PLATE NUMBER</th><th>HOURS</th><th>PAYMENT</th><th>DATE</th></tr></thead>
+            <tbody id="table-sale"></tbody>
         </table>
     </div>
 </div>
 
-<div id="receipt-box" style="display:none; font-family: monospace;">
-    <hr>
-    <h3>PARKING RECEIPT</h3>
-    <h1 id="r-plate"></h1>
-    <p>TIME IN: <span id="r-in"></span></p>
-    <p id="r-out-wrap">TIME OUT: <span id="r-out"></span></p>
-    <h2 id="r-total"></h2>
-    <hr>
-</div>
+<div id="print-area"></div>
 
 <script>
-    let activeParkers = [];
-    let historyLogs = [];
-    let salesLogs = [];
+    // Load Data from LocalStorage on Startup
+    let activeParkers = JSON.parse(localStorage.getItem('active_db')) || [];
+    let historyLogs = JSON.parse(localStorage.getItem('history_db')) || [];
+    let salesLogs = JSON.parse(localStorage.getItem('sales_db')) || [];
 
-    function showView(viewId) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        document.getElementById(viewId).classList.add('active');
-        event.currentTarget.classList.add('active');
-        
-        const titles = { 'dashboard': 'PARKING OVERVIEW', 'history': 'HISTORY', 'sales': 'SALES' };
-        document.getElementById('view-title').innerText = titles[viewId];
+    function saveAll() {
+        localStorage.setItem('active_db', JSON.stringify(activeParkers));
+        localStorage.setItem('history_db', JSON.stringify(historyLogs));
+        localStorage.setItem('sales_db', JSON.stringify(salesLogs));
+        render();
     }
 
     function checkIn() {
         const plate = document.getElementById('plateInput').value.trim().toUpperCase();
-        if (!plate) return;
+        if(!plate) return;
 
         const entry = {
             plate: plate,
             vehicle: "MOTORCYCLE",
-            timeIn: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            rawIn: new Date(),
+            entryTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            rawTime: new Date().getTime(),
             date: new Date().toLocaleDateString(),
             status: "PARKED"
         };
 
         activeParkers.push(entry);
         document.getElementById('plateInput').value = '';
-        renderAll();
+        saveAll();
     }
 
     function checkOut(index) {
         const item = activeParkers[index];
-        const outTime = new Date();
-        const diffMs = outTime - item.rawIn;
-        const totalHours = Math.ceil(diffMs / (1000 * 60 * 60));
+        const now = new Date();
+        const diffHrs = Math.ceil((now.getTime() - item.rawTime) / (1000 * 60 * 60));
         
-        // Calculation: 20 pesos for 4 hours, +5 pesos per extra hour
-        let payment = 20;
-        if (totalHours > 4) {
-            payment = 20 + ((totalHours - 4) * 5);
-        }
+        // Logic: 20 pesos for 4 hours, +5 pesos per extra hour
+        let fee = 20; 
+        if(diffHrs > 4) fee = 20 + ((diffHrs - 4) * 5);
 
         // Move to History and Sales
-        const historyEntry = { ...item, out: outTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: "UNPARKED" };
-        const salesEntry = { plate: item.plate, hours: totalHours + " HOURS", payment: payment + " PESOS", date: item.date };
+        historyLogs.push({
+            ...item, 
+            out: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+            status: "UNPARKED"
+        });
 
-        historyLogs.push(historyEntry);
-        salesLogs.push(salesEntry);
-        
-        // Setup Receipt and Print
-        document.getElementById('r-plate').innerText = item.plate;
-        document.getElementById('r-in').innerText = item.timeIn;
-        document.getElementById('r-out').innerText = historyEntry.out;
-        document.getElementById('r-total').innerText = "TOTAL: ₱" + payment;
-        document.getElementById('receipt-box').style.display = 'block';
+        salesLogs.push({
+            plate: item.plate,
+            hours: diffHrs + " HOURS",
+            payment: fee + " PESOS",
+            date: item.date
+        });
+
+        // Receipt Printing
+        document.getElementById('print-area').innerHTML = `<h2>RECEIPT</h2><hr>PLATE: ${item.plate}<br>FEE: ₱${fee}<br>HOURS: ${diffHrs}`;
         window.print();
 
         activeParkers.splice(index, 1);
-        renderAll();
+        saveAll();
     }
 
-    function renderAll() {
-        // Render Dashboard
-        const dashBody = document.getElementById('dashboard-table');
-        dashBody.innerHTML = activeParkers.map((p, i) => `
-            <tr>
-                <td>${p.plate}</td><td>${p.vehicle}</td><td>${p.timeIn}</td><td>--</td>
-                <td class="status-parked">${p.status}</td><td>${p.date}</td>
-                <td><button class="btn btn-checkout" onclick="checkOut(${i})">OUT</button></td>
-            </tr>
-        `).join('');
-
-        // Render History 
-        const historyBody = document.getElementById('history-table');
-        historyBody.innerHTML = historyLogs.map(p => `
-            <tr>
-                <td>${p.plate}</td><td>${p.vehicle}</td><td>${p.timeIn}</td><td>${p.out}</td>
-                <td class="status-unparked">${p.status}</td><td>${p.date}</td>
-            </tr>
-        `).join('');
-
-        // Render Sales 
-        const salesBody = document.getElementById('sales-table');
-        salesBody.innerHTML = salesLogs.map(s => `
-            <tr><td>${s.plate}</td><td>${s.hours}</td><td>${s.payment}</td><td>${s.date}</td></tr>
-        `).join('');
-        // This function runs every time you add a bike or check one out
-function saveToDatabase() {
-    const dataString = JSON.stringify(activeParkers);
-    localStorage.setItem('parking_data', dataString);
-    console.log("Data saved to hard drive.");
-
+    function showView(view) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById('view-' + view).classList.add('active');
+        event.currentTarget.classList.add('active');
+        const titles = {dash:'PARKING OVERVIEW', hist:'HISTORY', sale:'SALES'};
+        document.getElementById('view-title').innerText = titles[view];
     }
+
+    function render() {
+        document.getElementById('table-dash').innerHTML = activeParkers.map((r, i) => `
+            <tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>--</td>
+            <td class="status-parked">${r.status}</td><td>${r.date}</td>
+            <td><button onclick="checkOut(${i})">OUT</button></td></tr>`).join('');
+
+        document.getElementById('table-hist').innerHTML = historyLogs.map(r => `
+            <tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>${r.out}</td>
+            <td class="status-unparked">${r.status}</td><td>${r.date}</td></tr>`).reverse().join('');
+
+        document.getElementById('table-sale').innerHTML = salesLogs.map(s => `
+            <tr><td>${s.plate}</td><td>${s.hours}</td><td>${s.payment}</td><td>${s.date}</td></tr>`).reverse().join('');
+    }
+
+    render();
 </script>
 </body>
 </html>
