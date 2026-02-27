@@ -2,76 +2,175 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Motorcycle Parking System</title>
+    <title>Metro Plaza Bagong Silang - Parking System</title>
     <style>
-        :root { --primary: #1a73e8; --sidebar-bg: #2c3e50; --bg: #f8f9fa; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); height: 100vh; display: flex; }
+        :root { 
+            --primary: #2563eb; 
+            --primary-hover: #1d4ed8;
+            --sidebar-bg: #0f172a; 
+            --bg: #f1f5f9; 
+            --accent: #38bdf8;
+        }
+        
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; margin: 0; background: var(--bg); height: 100vh; display: flex; color: #1e293b; }
 
-        /* LOGIN SCREEN */
+        /* LOGIN SCREEN WITH BACKGROUND */
         #login-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #f0f2f5; display: flex; justify-content: center; align-items: center; z-index: 1000; 
+            background: linear-gradient(rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.8)), 
+                        url('https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&q=80&w=2000');
+            background-size: cover;
+            background-position: center;
+            display: flex; justify-content: center; align-items: center; z-index: 1000; 
         }
-        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 320px; text-align: center; }
-        .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .btn-login { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .login-card { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 40px; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); 
+            width: 360px; 
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        .login-card h2 { color: var(--sidebar-bg); margin-bottom: 8px; font-size: 1.5rem; }
+        .login-card p { color: #64748b; margin-bottom: 24px; font-size: 0.9rem; }
+        .login-card input { 
+            width: 100%; padding: 14px; margin-bottom: 16px; 
+            border: 1px solid #e2e8f0; border-radius: 8px; 
+            box-sizing: border-box; font-size: 1rem;
+        }
+        .btn-login { 
+            width: 100%; padding: 14px; background: var(--primary); 
+            color: white; border: none; border-radius: 8px; 
+            cursor: pointer; font-weight: 600; font-size: 1rem;
+            transition: background 0.2s;
+        }
+        .btn-login:hover { background: var(--primary-hover); }
 
-        /* SIDEBAR (From Admin PDF) */
-        #sidebar { width: 220px; background: var(--sidebar-bg); color: white; display: none; flex-direction: column; height: 100vh; position: fixed; }
-        .sidebar-header { padding: 25px; font-weight: bold; font-size: 1.2rem; border-bottom: 1px solid #3e4f5f; }
-        .nav-item { padding: 15px 25px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; }
-        .nav-item:hover, .nav-item.active { background: #34495e; border-left: 5px solid var(--primary); }
-        .logout { margin-top: auto; padding: 20px; color: #ff4757; text-align: center; cursor: pointer; font-weight: bold; border-top: 1px solid #3e4f5f; }
+        /* SIDEBAR */
+        #sidebar { 
+            width: 260px; background: var(--sidebar-bg); color: white; 
+            display: none; flex-direction: column; height: 100vh; position: fixed;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+        }
+        .sidebar-header { 
+            padding: 30px 25px; border-bottom: 1px solid #1e293b;
+        }
+        .sidebar-header h1 { font-size: 1.1rem; margin: 0; color: var(--accent); letter-spacing: 1px; }
+        .sidebar-header span { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; }
+        
+        .nav-item { 
+            padding: 16px 25px; cursor: pointer; transition: 0.2s; 
+            display: flex; align-items: center; color: #94a3b8; font-weight: 500;
+        }
+        .nav-item:hover { color: white; background: #1e293b; }
+        .nav-item.active { 
+            background: var(--primary); color: white; border-left: 4px solid var(--accent); 
+        }
+        .logout { 
+            margin-top: auto; padding: 25px; color: #f87171; 
+            text-align: center; cursor: pointer; font-weight: 600; 
+            border-top: 1px solid #1e293b;
+        }
 
         /* MAIN CONTENT */
-        #main { margin-left: 220px; flex-grow: 1; padding: 30px; display: none; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .view { display: none; }
+        #main { margin-left: 260px; flex-grow: 1; padding: 40px; display: none; }
+        .header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 32px; background: white; padding: 20px 30px;
+            border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .header h2 { margin: 0; font-size: 1.25rem; color: #0f172a; }
+        .view { display: none; animation: fadeIn 0.3s ease-in-out; }
         .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* TABLE STYLES */
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f1f3f4; color: #5f6368; font-size: 0.8rem; text-transform: uppercase; }
-        .status-parked { color: #28a745; font-weight: bold; }
-        .status-unparked { color: #dc3545; font-weight: bold; }
+        /* KIOSK ENTRY AREA */
+        .kiosk-entry { 
+            background: white; padding: 24px; border-radius: 12px; 
+            margin-bottom: 24px; display: flex; gap: 12px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        }
+        .kiosk-entry input { 
+            flex-grow: 1; padding: 14px; border: 2px solid #e2e8f0; 
+            border-radius: 8px; text-transform: uppercase; font-size: 1.1rem;
+            font-weight: 600; color: var(--sidebar-bg);
+        }
+        .kiosk-entry input:focus { border-color: var(--primary); outline: none; }
 
-        .kiosk-entry { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .kiosk-entry input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 5px; text-transform: uppercase; font-size: 1rem; }
+        /* TABLE DESIGN */
+        table { 
+            width: 100%; border-collapse: separate; border-spacing: 0;
+            background: white; border-radius: 12px; overflow: hidden; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        }
+        th { 
+            background: #f8fafc; color: #64748b; font-size: 0.75rem; 
+            text-transform: uppercase; padding: 18px; font-weight: 700;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        td { padding: 18px; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
+        tr:hover td { background: #f8fafc; }
         
-        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
+        .status-parked { background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 99px; font-size: 0.8rem; }
+        .status-unparked { background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 99px; font-size: 0.8rem; }
+        
+        .btn-out {
+            background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;
+        }
+        .btn-out:hover { background: #e2e8f0; color: #1e293b; }
+
+        @media print { 
+            body * { visibility: hidden; } 
+            #print-area, #print-area * { visibility: visible; } 
+            #print-area { position: absolute; top: 0; width: 100%; text-align: center; font-family: monospace; } 
+        }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
     <div class="login-card">
-        <h2>ADMIN LOGIN</h2>
-        <input type="text" id="user" placeholder="Username">
+        <h2>METRO PLAZA</h2>
+        <p>Parking Management System</p>
+        <input type="text" id="user" placeholder="Admin Username">
         <input type="password" id="pass" placeholder="Password">
-        <button class="btn-login" onclick="login()">LOG IN</button>
-        <p id="err" style="color:red; display:none; margin-top:10px;">Invalid Access</p>
+        <button class="btn-login" onclick="login()">SECURE LOG IN</button>
+        <p id="err" style="color:#ef4444; display:none; margin-top:16px; font-weight: 600;">Access Denied: Invalid Credentials</p>
     </div>
 </div>
 
 <div id="sidebar">
-    <div class="sidebar-header">ADMIN</div>
-    <div class="nav-item active" onclick="showTab('dashboard')"> DASH BOARD</div>
-    <div class="nav-item" onclick="showTab('history')">HISTORY</div>
-    <div class="nav-item" onclick="showTab('sales')">SALES</div>
-    <div class="logout" onclick="location.reload()">LOG OUT</div>
+    <div class="sidebar-header">
+        <h1>METRO PLAZA</h1>
+        <span>Bagong Silang Branch</span>
+    </div>
+    <div class="nav-item active" onclick="showTab('dashboard', this)">
+        <span style="margin-right: 12px;">📊</span> DASH BOARD
+    </div>
+    <div class="nav-item" onclick="showTab('history', this)">
+        <span style="margin-right: 12px;">🕒</span> HISTORY
+    </div>
+    <div class="nav-item" onclick="showTab('sales', this)">
+        <span style="margin-right: 12px;">💰</span> SALES
+    </div>
+    <div class="logout" onclick="location.reload()">LOG OUT SYSTEM</div>
 </div>
 
 <div id="main">
     <div class="header">
         <h2 id="page-title">PARKING OVERVIEW</h2>
-        <span>WELCOME, ADMIN</span>
+        <div style="text-align: right;">
+            <div style="font-weight: 700; color: #0f172a;">ADMINISTRATOR</div>
+            <div id="live-clock" style="font-size: 0.8rem; color: #64748b;"></div>
+        </div>
     </div>
 
     <div id="dashboard" class="view active">
         <div class="kiosk-entry">
-            <input type="text" id="plateInput" placeholder="ENTER PLATE NUMBER (e.g. ABC123)">
-            <button class="btn-login" style="width:150px" onclick="checkIn()">CHECK-IN</button>
+            <input type="text" id="plateInput" placeholder="SCAN OR TYPE PLATE NUMBER">
+            <button class="btn-login" style="width:180px" onclick="checkIn()">CHECK-IN VEHICLE</button>
         </div>
         <table>
             <thead><tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
@@ -98,7 +197,7 @@
 
 <script>
     let db;
-    const request = indexedDB.open("ParkingDB", 1);
+    const request = indexedDB.open("ParkingDB_MetroPlaza", 1);
 
     request.onupgradeneeded = (e) => {
         db = e.target.result;
@@ -109,10 +208,17 @@
 
     request.onsuccess = (e) => { db = e.target.result; render(); };
 
+    // Clock setup
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('live-clock').innerText = now.toLocaleString();
+    }, 1000);
+
     function login() {
         const u = document.getElementById('user').value;
         const p = document.getElementById('pass').value;
-        if(u === "admin" && p === "1234") {
+        // Using your updated password from the prompt
+        if(u === "admin" && p === "0526") {
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('sidebar').style.display = 'flex';
             document.getElementById('main').style.display = 'block';
@@ -121,13 +227,13 @@
         }
     }
 
-    function showTab(tabId) {
+    function showTab(tabId, element) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
-        event.currentTarget.classList.add('active');
+        element.classList.add('active');
         
-        const titles = { dashboard: 'PARKING OVERVIEW', history: 'HISTORY', sales: 'SALES' };
+        const titles = { dashboard: 'PARKING OVERVIEW', history: 'PARKING HISTORY', sales: 'REVENUE & SALES' };
         document.getElementById('page-title').innerText = titles[tabId];
     }
 
@@ -142,8 +248,10 @@
         };
 
         const tx = db.transaction("active", "readwrite");
-        tx.objectStore("active").add(data);
-        tx.oncomplete = () => { document.getElementById('plateInput').value = ''; render(); };
+        tx.objectStore("active").add(data).onsuccess = () => {
+            document.getElementById('plateInput').value = ''; 
+            render();
+        };
     }
 
     function checkOut(plate) {
@@ -156,11 +264,23 @@
             let payment = 20;
             if(diffHours > 4) payment = 20 + ((diffHours - 4) * 5);
 
-            // Print Receipt
-            document.getElementById('print-area').innerHTML = `<h3>PARKING TICKET</h3>PLATE: ${plate}<br>DATE: ${data.date}<br>FEE: ₱${payment}<br>HOURS: ${diffHours}`;
+            // Receipt Design
+            document.getElementById('print-area').innerHTML = `
+                <div style="text-align:center;">
+                    <h2>METRO PLAZA</h2>
+                    <p>Bagong Silang, Caloocan</p>
+                    <hr>
+                    <p>PLATE: ${plate}</p>
+                    <p>DATE: ${data.date}</p>
+                    <p>IN: ${data.entryTime}</p>
+                    <p>OUT: ${now.toLocaleTimeString()}</p>
+                    <h3>FEE: ₱${payment}.00</h3>
+                    <p>Duration: ${diffHours} Hr(s)</p>
+                    <hr>
+                    <p>Thank you for parking!</p>
+                </div>`;
             window.print();
 
-            // Archive Data
             tx.objectStore("history").add({ ...data, out: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: "UNPARKED" });
             tx.objectStore("sales").add({ plate: plate, hours: diffHours + " HOURS", payment: payment + " PESOS", date: data.date });
             tx.objectStore("active").delete(plate);
@@ -169,24 +289,45 @@
     }
 
     function render() {
+        if (!db) return;
+        
+        // Active Table
         const dash = document.getElementById('table-dash'); dash.innerHTML = '';
         db.transaction("active").objectStore("active").getAll().onsuccess = (e) => {
             e.target.result.forEach(r => {
-                dash.innerHTML += `<tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>--</td><td class="status-parked">${r.status}</td><td>${r.date}</td><td><button onclick="checkOut('${r.plate}')">OUT</button></td></tr>`;
+                dash.innerHTML += `<tr>
+                    <td style="font-weight:700;">${r.plate}</td>
+                    <td>${r.vehicle}</td>
+                    <td>${r.entryTime}</td>
+                    <td>--</td>
+                    <td><span class="status-parked">PARKED</span></td>
+                    <td>${r.date}</td>
+                    <td><button class="btn-out" onclick="checkOut('${r.plate}')">RELEASE</button></td>
+                </tr>`;
             });
         };
 
+        // History Table
         const hist = document.getElementById('table-hist'); hist.innerHTML = '';
         db.transaction("history").objectStore("history").getAll().onsuccess = (e) => {
             e.target.result.reverse().forEach(r => {
-                hist.innerHTML += `<tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>${r.out}</td><td class="status-unparked">${r.status}</td><td>${r.date}</td></tr>`;
+                hist.innerHTML += `<tr>
+                    <td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td>
+                    <td>${r.out}</td><td><span class="status-unparked">EXITED</span></td><td>${r.date}</td>
+                </tr>`;
             });
         };
 
+        // Sales Table
         const sale = document.getElementById('table-sale'); sale.innerHTML = '';
         db.transaction("sales").objectStore("sales").getAll().onsuccess = (e) => {
             e.target.result.reverse().forEach(r => {
-                sale.innerHTML += `<tr><td>${r.plate}</td><td>${r.hours}</td><td>${r.payment}</td><td>${r.date}</td></tr>`;
+                sale.innerHTML += `<tr>
+                    <td style="font-weight:700;">${r.plate}</td>
+                    <td>${r.hours}</td>
+                    <td style="color: #16a34a; font-weight:700;">₱${r.payment}</td>
+                    <td>${r.date}</td>
+                </tr>`;
             });
         };
     }
