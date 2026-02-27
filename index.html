@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metro Plaza Bagong Silang - Cloud Management</title>
+    <title>Metro Plaza Bagong Silang - Management System</title>
     <style>
         :root { 
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
@@ -126,125 +125,79 @@
 <div id="print-area"></div>
 
 <script>
-    // --- 1. MONGODB CLOUD CONFIGURATION ---
-    // PASTE YOUR KEYS FROM MONGODB ATLAS APP SERVICES HERE
-    const MONGODB_KEY = "PASTE_YOUR_DATA_API_KEY_HERE"; 
-    const MONGODB_URL = "PASTE_YOUR_URL_ENDPOINT_HERE";
-    const CLUSTER = "METROPLAZABGS";
-    const DATABASE = "MetroPlazaDB";
+    let db;
+    const request = indexedDB.open("MetroPlazaRedDB", 1);
+    request.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        d.createObjectStore("active", { keyPath: "plate" });
+        d.createObjectStore("history", { autoIncrement: true });
+        d.createObjectStore("sales", { autoIncrement: true });
+    };
+    request.onsuccess = (e) => { db = e.target.result; render(); };
 
-    // --- 2. CLOUD API HELPER ---
-    async function callCloud(action, collection, extraBody = {}) {
-        try {
-            const response = await fetch(`${MONGODB_URL}/action/${action}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'api-key': MONGODB_KEY },
-                body: JSON.stringify({
-                    dataSource: CLUSTER,
-                    database: DATABASE,
-                    collection: collection,
-                    ...extraBody
-                })
-            });
-            return response.json();
-        } catch (err) {
-            console.error("Cloud Error:", err);
-            return { error: true };
-        }
-    }
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 
-    // --- 3. SYSTEM LOGIC ---
-    setInterval(() => { 
-        document.getElementById('clock').innerText = new Date().toLocaleString(); 
-    }, 1000);
-
+    // Initial Login
     function login() {
         if(document.getElementById('pass').value === "0526") {
             document.getElementById('login-overlay').style.display = 'none';
-            render(); 
         } else { alert("Access Denied"); }
     }
 
+    // Switch to Kiosk
     function enterKiosk() { 
         document.getElementById('kiosk-view').style.display = 'flex'; 
         document.getElementById('kioskPlate').focus();
     }
 
-    function exitKiosk() { document.getElementById('kiosk-view').style.display = 'none'; }
+    // Switch back to Admin (NO PASSWORD REQUIRED)
+    function exitKiosk() { 
+        document.getElementById('kiosk-view').style.display = 'none'; 
+    }
 
-    async function kioskCheckIn() {
+    function kioskCheckIn() {
         const pInput = document.getElementById('kioskPlate');
         const plate = pInput.value.trim().toUpperCase();
         if(!plate) return;
 
-        // Check if already in cloud
-        const check = await callCloud("findOne", "active_parking", { filter: { plate: plate } });
-        if (check.document) {
-            document.getElementById('kiosk-status').innerText = "❌ ALREADY PARKED";
-            return;
-        }
-
         const data = {
-            plate: plate, 
-            entryTime: new Date().toLocaleTimeString(),
-            rawIn: Date.now(), 
-            date: new Date().toLocaleDateString(), 
-            status: "PARKED"
+            plate: plate, entryTime: new Date().toLocaleTimeString(),
+            rawIn: new Date().getTime(), date: new Date().toLocaleDateString(), status: "PARKED"
         };
 
-        const result = await callCloud("insertOne", "active_parking", { document: data });
-        if(result.insertedId) {
+        const tx = db.transaction("active", "readwrite");
+        const req = tx.objectStore("active").add(data);
+        req.onsuccess = () => {
             document.getElementById('kiosk-status').innerHTML = "✅ SUCCESS: " + plate;
             pInput.value = ""; render();
             setTimeout(() => { document.getElementById('kiosk-status').innerText = ""; }, 3000);
-        }
+        };
+        req.onerror = () => { document.getElementById('kiosk-status').innerText = "❌ ALREADY IN SYSTEM"; };
     }
 
-    async function checkOut(plate) {
-        const res = await callCloud("findOne", "active_parking", { filter: { plate: plate } });
-        const data = res.document;
-        if(!data) return;
+    function checkOut(plate) {
+        const tx = db.transaction(["active", "history", "sales"], "readwrite");
+        tx.objectStore("active").get(plate).onsuccess = (e) => {
+            const data = e.target.result;
+            const hrs = Math.ceil((new Date().getTime() - data.rawIn) / (1000 * 60 * 60));
+            const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
-        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
+            document.getElementById('print-area').innerHTML = `
+                <div style="text-align:center; padding:20px; border:2px dashed #000;">
+                    <h2>METRO PLAZA</h2>
+                    <p>Bagong Silang</p><hr>
+                    <b>PLATE: ${plate}</b><br>
+                    TIME IN: ${data.entryTime}<br>
+                    TIME OUT: ${new Date().toLocaleTimeString()}<br>
+                    <h3>FEE: P${payment}.00</h3>
+                </div>`;
+            window.print();
 
-        document.getElementById('print-area').innerHTML = `
-            <div style="text-align:center; padding:20px; border:2px dashed #000;">
-                <h2>METRO PLAZA</h2><p>Bagong Silang</p><hr>
-                <b>PLATE: ${plate}</b><br>
-                TIME IN: ${data.entryTime}<br>
-                TIME OUT: ${new Date().toLocaleTimeString()}<br>
-                <h3>FEE: P${payment}.00</h3>
-            </div>`;
-        window.print();
-
-        // Save to History and Sales collections
-        await callCloud("insertOne", "parking_history", { 
-            document: {...data, out: new Date().toLocaleTimeString(), status: "EXITED"} 
-        });
-        await callCloud("insertOne", "sales_report", { 
-            document: {plate: plate, hrs: hrs + " hrs", pay: "P" + payment, date: data.date} 
-        });
-        
-        // Remove from active
-        await callCloud("deleteOne", "active_parking", { filter: { plate: plate } });
-        render();
-    }
-
-    async function render() {
-        const activeRes = await callCloud("find", "active_parking");
-        document.getElementById('table-dash').innerHTML = (activeRes.documents || []).map(r => `
-            <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.entryTime}</td>
-            <td><span style="color:green; font-weight:bold;">● PARKED</span></td><td>${r.date}</td>
-            <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`).join('');
-
-        const histRes = await callCloud("find", "parking_history", { limit: 50 });
-        document.getElementById('table-hist').innerHTML = (histRes.documents || []).reverse().map(r => `
-            <tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td style="color:red;">EXITED</td><td>${r.date}</td></tr>`).join('');
-
-        const salesRes = await callCloud("find", "sales_report", { limit: 50 });
-        document.getElementById('table-sale').innerHTML = (salesRes.documents || []).reverse().map(r => `
-            <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.hrs}</td><td style="color:var(--red-main); font-weight:bold;">${r.pay}</td><td>${r.date}</td></tr>`).join('');
+            tx.objectStore("history").add({...data, out: new Date().toLocaleTimeString(), status: "UNPARKED"});
+            tx.objectStore("sales").add({plate: plate, hrs: hrs + " hrs", pay: "P" + payment, date: data.date});
+            tx.objectStore("active").delete(plate);
+        };
+        tx.oncomplete = () => render();
     }
 
     function showTab(tabId, el) {
@@ -254,6 +207,24 @@
         el.classList.add('active');
         const titles = {dash:'PARKING OVERVIEW', hist:'HISTORY LOGS', sale:'SALES REPORT'};
         document.getElementById('view-title').innerText = titles[tabId];
+    }
+
+    function render() {
+        if(!db) return;
+        db.transaction("active").objectStore("active").getAll().onsuccess = (e) => {
+            document.getElementById('table-dash').innerHTML = e.target.result.map(r => `
+                <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.entryTime}</td>
+                <td><span style="color:green; font-weight:bold;">● PARKED</span></td><td>${r.date}</td>
+                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`).join('');
+        };
+        db.transaction("history").objectStore("history").getAll().onsuccess = (e) => {
+            document.getElementById('table-hist').innerHTML = e.target.result.reverse().map(r => `
+                <tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td style="color:red;">EXITED</td><td>${r.date}</td></tr>`).join('');
+        };
+        db.transaction("sales").objectStore("sales").getAll().onsuccess = (e) => {
+            document.getElementById('table-sale').innerHTML = e.target.result.reverse().map(r => `
+                <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.hrs}</td><td style="color:var(--red-main); font-weight:bold;">${r.pay}</td><td>${r.date}</td></tr>`).join('');
+        };
     }
 </script>
 </body>
