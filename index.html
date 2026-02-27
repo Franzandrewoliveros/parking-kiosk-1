@@ -685,6 +685,12 @@
             document.getElementById('table-sale').innerHTML = e.target.result.reverse().map(r => `
                 <tr><td style="font-weight:bold;">${r.plate}</td><td>${r.hrs}</td><td style="color:var(--red-main); font-weight:bold;">${r.pay}</td><td>${r.date}</td></tr>`).join('');
         };
+        // Initial Login
+function login() {
+    if(document.getElementById('pass').value === "0526") { // <--- THIS LINE
+        document.getElementById('login-overlay').style.display = 'none';
+    } else { alert("Access Denied"); }
+}
     }
 </script>
 </body>
