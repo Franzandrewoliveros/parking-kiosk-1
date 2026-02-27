@@ -2,56 +2,76 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Motorcycle Parking System - Persistent</title>
+    <title>Motorcycle Parking System</title>
     <style>
-        :root { --primary: #1a73e8; --sidebar: #2c3e50; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f8f9fa; height: 100vh; }
-        
-        /* Sidebar Styles from ADMIN.pdf */
-        #sidebar { width: 220px; background: var(--sidebar); color: white; display: flex; flex-direction: column; }
-        .nav-item { padding: 18px 25px; cursor: pointer; border-bottom: 1px solid #34495e; transition: 0.3s; }
-        .nav-item:hover, .nav-item.active { background: #34495e; border-left: 5px solid var(--primary); }
-        .logout { margin-top: auto; padding: 20px; color: #ff4757; text-align: center; cursor: pointer; font-weight: bold; border-top: 1px solid #34495e; }
+        :root { --primary: #1a73e8; --sidebar-bg: #2c3e50; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); height: 100vh; display: flex; }
 
-        /* Main Content Area */
-        #main { flex-grow: 1; padding: 30px; overflow-y: auto; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
+        /* LOGIN SCREEN */
+        #login-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #f0f2f5; display: flex; justify-content: center; align-items: center; z-index: 1000; 
+        }
+        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 320px; text-align: center; }
+        .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .btn-login { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+
+        /* SIDEBAR (From Admin PDF) */
+        #sidebar { width: 220px; background: var(--sidebar-bg); color: white; display: none; flex-direction: column; height: 100vh; position: fixed; }
+        .sidebar-header { padding: 25px; font-weight: bold; font-size: 1.2rem; border-bottom: 1px solid #3e4f5f; }
+        .nav-item { padding: 15px 25px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; }
+        .nav-item:hover, .nav-item.active { background: #34495e; border-left: 5px solid var(--primary); }
+        .logout { margin-top: auto; padding: 20px; color: #ff4757; text-align: center; cursor: pointer; font-weight: bold; border-top: 1px solid #3e4f5f; }
+
+        /* MAIN CONTENT */
+        #main { margin-left: 220px; flex-grow: 1; padding: 30px; display: none; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         .view { display: none; }
         .view.active { display: block; }
 
-        /* Table & Form Styles */
-        .kiosk-form { background: white; padding: 20px; border-radius: 8px; display: flex; gap: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 4px; text-transform: uppercase; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
+        /* TABLE STYLES */
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f1f3f4; color: #666; font-size: 12px; }
+        th { background: #f1f3f4; color: #5f6368; font-size: 0.8rem; text-transform: uppercase; }
         .status-parked { color: #28a745; font-weight: bold; }
         .status-unparked { color: #dc3545; font-weight: bold; }
-        .btn-blue { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
 
-        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top:0; width: 100%; text-align: center; } }
+        .kiosk-entry { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .kiosk-entry input { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 5px; text-transform: uppercase; font-size: 1rem; }
+        
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
     </style>
 </head>
 <body>
 
+<div id="login-overlay">
+    <div class="login-card">
+        <h2>ADMIN LOGIN</h2>
+        <input type="text" id="user" placeholder="Username">
+        <input type="password" id="pass" placeholder="Password">
+        <button class="btn-login" onclick="login()">LOG IN</button>
+        <p id="err" style="color:red; display:none; margin-top:10px;">Invalid Access</p>
+    </div>
+</div>
+
 <div id="sidebar">
-    <div style="padding: 25px; font-weight: bold; font-size: 1.2rem;">ADMIN</div>
-    <div class="nav-item active" onclick="showView('dash')">8 DASH BOARD</div>
-    <div class="nav-item" onclick="showView('hist')">HISTORY</div>
-    <div class="nav-item" onclick="showView('sale')">SALES</div>
+    <div class="sidebar-header">ADMIN</div>
+    <div class="nav-item active" onclick="showTab('dashboard')"> DASH BOARD</div>
+    <div class="nav-item" onclick="showTab('history')">HISTORY</div>
+    <div class="nav-item" onclick="showTab('sales')">SALES</div>
     <div class="logout" onclick="location.reload()">LOG OUT</div>
 </div>
 
 <div id="main">
     <div class="header">
-        <h2 id="view-title">PARKING OVERVIEW</h2>
-        <div style="font-weight: bold; color: #555;">WELCOME, ADMIN</div>
+        <h2 id="page-title">PARKING OVERVIEW</h2>
+        <span>WELCOME, ADMIN</span>
     </div>
 
-    <div id="view-dash" class="view active">
-        <div class="kiosk-form">
-            <input type="text" id="plateInput" placeholder="ENTER PLATE NUMBER (E.G. ABC123)">
-            <button class="btn-blue" onclick="checkIn()">CHECK-IN</button>
+    <div id="dashboard" class="view active">
+        <div class="kiosk-entry">
+            <input type="text" id="plateInput" placeholder="ENTER PLATE NUMBER (e.g. ABC123)">
+            <button class="btn-login" style="width:150px" onclick="checkIn()">CHECK-IN</button>
         </div>
         <table>
             <thead><tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
@@ -59,14 +79,14 @@
         </table>
     </div>
 
-    <div id="view-hist" class="view">
+    <div id="history" class="view">
         <table>
             <thead><tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th></tr></thead>
             <tbody id="table-hist"></tbody>
         </table>
     </div>
 
-    <div id="view-sale" class="view">
+    <div id="sales" class="view">
         <table>
             <thead><tr><th>PLATE NUMBER</th><th>HOURS</th><th>PAYMENT</th><th>DATE</th></tr></thead>
             <tbody id="table-sale"></tbody>
@@ -77,91 +97,99 @@
 <div id="print-area"></div>
 
 <script>
-    // Load Data from LocalStorage on Startup
-    let activeParkers = JSON.parse(localStorage.getItem('active_db')) || [];
-    let historyLogs = JSON.parse(localStorage.getItem('history_db')) || [];
-    let salesLogs = JSON.parse(localStorage.getItem('sales_db')) || [];
+    let db;
+    const request = indexedDB.open("ParkingDB", 1);
 
-    function saveAll() {
-        localStorage.setItem('active_db', JSON.stringify(activeParkers));
-        localStorage.setItem('history_db', JSON.stringify(historyLogs));
-        localStorage.setItem('sales_db', JSON.stringify(salesLogs));
-        render();
+    request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        db.createObjectStore("active", { keyPath: "plate" });
+        db.createObjectStore("history", { autoIncrement: true });
+        db.createObjectStore("sales", { autoIncrement: true });
+    };
+
+    request.onsuccess = (e) => { db = e.target.result; render(); };
+
+    function login() {
+        const u = document.getElementById('user').value;
+        const p = document.getElementById('pass').value;
+        if(u === "admin" && p === "1234") {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('sidebar').style.display = 'flex';
+            document.getElementById('main').style.display = 'block';
+        } else {
+            document.getElementById('err').style.display = 'block';
+        }
+    }
+
+    function showTab(tabId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+        
+        const titles = { dashboard: 'PARKING OVERVIEW', history: 'HISTORY', sales: 'SALES' };
+        document.getElementById('page-title').innerText = titles[tabId];
     }
 
     function checkIn() {
         const plate = document.getElementById('plateInput').value.trim().toUpperCase();
         if(!plate) return;
 
-        const entry = {
-            plate: plate,
-            vehicle: "MOTORCYCLE",
+        const data = {
+            plate: plate, vehicle: "MOTORCYCLE",
             entryTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            rawTime: new Date().getTime(),
-            date: new Date().toLocaleDateString(),
-            status: "PARKED"
+            rawIn: new Date(), date: new Date().toLocaleDateString(), status: "PARKED"
         };
 
-        activeParkers.push(entry);
-        document.getElementById('plateInput').value = '';
-        saveAll();
+        const tx = db.transaction("active", "readwrite");
+        tx.objectStore("active").add(data);
+        tx.oncomplete = () => { document.getElementById('plateInput').value = ''; render(); };
     }
 
-    function checkOut(index) {
-        const item = activeParkers[index];
-        const now = new Date();
-        const diffHrs = Math.ceil((now.getTime() - item.rawTime) / (1000 * 60 * 60));
-        
-        // Logic: 20 pesos for 4 hours, +5 pesos per extra hour
-        let fee = 20; 
-        if(diffHrs > 4) fee = 20 + ((diffHrs - 4) * 5);
+    function checkOut(plate) {
+        const tx = db.transaction(["active", "history", "sales"], "readwrite");
+        tx.objectStore("active").get(plate).onsuccess = (e) => {
+            const data = e.target.result;
+            const now = new Date();
+            const diffHours = Math.ceil((now - data.rawIn) / (1000 * 60 * 60));
+            
+            let payment = 20;
+            if(diffHours > 4) payment = 20 + ((diffHours - 4) * 5);
 
-        // Move to History and Sales
-        historyLogs.push({
-            ...item, 
-            out: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
-            status: "UNPARKED"
-        });
+            // Print Receipt
+            document.getElementById('print-area').innerHTML = `<h3>PARKING TICKET</h3>PLATE: ${plate}<br>DATE: ${data.date}<br>FEE: ₱${payment}<br>HOURS: ${diffHours}`;
+            window.print();
 
-        salesLogs.push({
-            plate: item.plate,
-            hours: diffHrs + " HOURS",
-            payment: fee + " PESOS",
-            date: item.date
-        });
-
-        // Receipt Printing
-        document.getElementById('print-area').innerHTML = `<h2>RECEIPT</h2><hr>PLATE: ${item.plate}<br>FEE: ₱${fee}<br>HOURS: ${diffHrs}`;
-        window.print();
-
-        activeParkers.splice(index, 1);
-        saveAll();
-    }
-
-    function showView(view) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        document.getElementById('view-' + view).classList.add('active');
-        event.currentTarget.classList.add('active');
-        const titles = {dash:'PARKING OVERVIEW', hist:'HISTORY', sale:'SALES'};
-        document.getElementById('view-title').innerText = titles[view];
+            // Archive Data
+            tx.objectStore("history").add({ ...data, out: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: "UNPARKED" });
+            tx.objectStore("sales").add({ plate: plate, hours: diffHours + " HOURS", payment: payment + " PESOS", date: data.date });
+            tx.objectStore("active").delete(plate);
+        };
+        tx.oncomplete = () => render();
     }
 
     function render() {
-        document.getElementById('table-dash').innerHTML = activeParkers.map((r, i) => `
-            <tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>--</td>
-            <td class="status-parked">${r.status}</td><td>${r.date}</td>
-            <td><button onclick="checkOut(${i})">OUT</button></td></tr>`).join('');
+        const dash = document.getElementById('table-dash'); dash.innerHTML = '';
+        db.transaction("active").objectStore("active").getAll().onsuccess = (e) => {
+            e.target.result.forEach(r => {
+                dash.innerHTML += `<tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>--</td><td class="status-parked">${r.status}</td><td>${r.date}</td><td><button onclick="checkOut('${r.plate}')">OUT</button></td></tr>`;
+            });
+        };
 
-        document.getElementById('table-hist').innerHTML = historyLogs.map(r => `
-            <tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>${r.out}</td>
-            <td class="status-unparked">${r.status}</td><td>${r.date}</td></tr>`).reverse().join('');
+        const hist = document.getElementById('table-hist'); hist.innerHTML = '';
+        db.transaction("history").objectStore("history").getAll().onsuccess = (e) => {
+            e.target.result.reverse().forEach(r => {
+                hist.innerHTML += `<tr><td>${r.plate}</td><td>${r.vehicle}</td><td>${r.entryTime}</td><td>${r.out}</td><td class="status-unparked">${r.status}</td><td>${r.date}</td></tr>`;
+            });
+        };
 
-        document.getElementById('table-sale').innerHTML = salesLogs.map(s => `
-            <tr><td>${s.plate}</td><td>${s.hours}</td><td>${s.payment}</td><td>${s.date}</td></tr>`).reverse().join('');
+        const sale = document.getElementById('table-sale'); sale.innerHTML = '';
+        db.transaction("sales").objectStore("sales").getAll().onsuccess = (e) => {
+            e.target.result.reverse().forEach(r => {
+                sale.innerHTML += `<tr><td>${r.plate}</td><td>${r.hours}</td><td>${r.payment}</td><td>${r.date}</td></tr>`;
+            });
+        };
     }
-
-    render();
 </script>
 </body>
 </html>
