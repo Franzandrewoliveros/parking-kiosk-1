@@ -1,0 +1,194 @@
+<<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Parking Management</title>
+    <style>
+        :root { --sidebar-width: 200px; --primary: #1a73e8; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f8f9fa; }
+        
+        /* Sidebar Styles */
+        #sidebar { width: var(--sidebar-width); background: #2c3e50; color: white; height: 100vh; position: fixed; padding: 20px 0; }
+        #sidebar h2 { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #3e4f5f; padding-bottom: 10px; }
+        .nav-item { padding: 15px 25px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; }
+        .nav-item:hover, .nav-item.active { background: #34495e; border-left: 4px solid var(--primary); }
+        .logout { position: absolute; bottom: 20px; width: 100%; color: #ff4757; font-weight: bold; cursor: pointer; text-align: center; }
+
+        /* Main Content */
+        #main { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); padding: 30px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* Tables & UI Elements */
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f1f3f4; color: #5f6368; text-transform: uppercase; font-size: 0.85rem; }
+        .status-parked { color: #28a745; font-weight: bold; }
+        .status-unparked { color: #dc3545; font-weight: bold; }
+        
+        .kiosk-entry { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; border: 1px solid #ddd; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 5px; flex-grow: 1; text-transform: uppercase; font-size: 1rem; }
+        .btn { padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-checkin { background: var(--primary); color: white; }
+        .btn-checkout { background: #dc3545; color: white; padding: 5px 10px; font-size: 0.8rem; }
+
+        /* Print Style */
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-box, #receipt-box * { visibility: visible; }
+            #receipt-box { position: absolute; top: 0; left: 0; width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <h2>ADMIN</h2>
+    <div class="nav-item active" onclick="showView('dashboard')">DASHBOARD</div>
+    <div class="nav-item" onclick="showView('history')">HISTORY</div>
+    <div class="nav-item" onclick="showView('sales')">SALES</div>
+    <div class="logout">LOG OUT</div>
+</div>
+
+<div id="main">
+    <div class="header">
+        <h2 id="view-title">PARKING OVERVIEW</h2>
+        <span>WELCOME, ADMIN</span>
+    </div>
+
+    <div id="dashboard" class="view active">
+        <div class="kiosk-entry">
+            <input type="text" id="plateInput" placeholder="ENTER PLATE NUMBER (e.g. ABC123)">
+            <button class="btn btn-checkin" onclick="checkIn()">CHECK-IN</button>
+        </div>
+        <table>
+            <thead>
+                <tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr>
+            </thead>
+            <tbody id="dashboard-table"></tbody>
+        </table>
+    </div>
+
+    <div id="history" class="view">
+        <table>
+            <thead>
+                <tr><th>PLATE NUMBER</th><th>VEHICLE</th><th>ENTRY TIME</th><th>OUT</th><th>STATUS</th><th>DATE</th></tr>
+            </thead>
+            <tbody id="history-table"></tbody>
+        </table>
+    </div>
+
+    <div id="sales" class="view">
+        <table>
+            <thead>
+                <tr><th>PLATE NUMBER</th><th>HOURS</th><th>PAYMENT</th><th>DATE</th></tr>
+            </thead>
+            <tbody id="sales-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="receipt-box" style="display:none; font-family: monospace;">
+    <hr>
+    <h3>PARKING RECEIPT</h3>
+    <h1 id="r-plate"></h1>
+    <p>TIME IN: <span id="r-in"></span></p>
+    <p id="r-out-wrap">TIME OUT: <span id="r-out"></span></p>
+    <h2 id="r-total"></h2>
+    <hr>
+</div>
+
+<script>
+    let activeParkers = [];
+    let historyLogs = [];
+    let salesLogs = [];
+
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+        event.currentTarget.classList.add('active');
+        
+        const titles = { 'dashboard': 'PARKING OVERVIEW', 'history': 'HISTORY', 'sales': 'SALES' };
+        document.getElementById('view-title').innerText = titles[viewId];
+    }
+
+    function checkIn() {
+        const plate = document.getElementById('plateInput').value.trim().toUpperCase();
+        if (!plate) return;
+
+        const entry = {
+            plate: plate,
+            vehicle: "MOTORCYCLE",
+            timeIn: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            rawIn: new Date(),
+            date: new Date().toLocaleDateString(),
+            status: "PARKED"
+        };
+
+        activeParkers.push(entry);
+        document.getElementById('plateInput').value = '';
+        renderAll();
+    }
+
+    function checkOut(index) {
+        const item = activeParkers[index];
+        const outTime = new Date();
+        const diffMs = outTime - item.rawIn;
+        const totalHours = Math.ceil(diffMs / (1000 * 60 * 60));
+        
+        // Calculation: 20 pesos for 4 hours, +5 pesos per extra hour
+        let payment = 20;
+        if (totalHours > 4) {
+            payment = 20 + ((totalHours - 4) * 5);
+        }
+
+        // Move to History and Sales
+        const historyEntry = { ...item, out: outTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: "UNPARKED" };
+        const salesEntry = { plate: item.plate, hours: totalHours + " HOURS", payment: payment + " PESOS", date: item.date };
+
+        historyLogs.push(historyEntry);
+        salesLogs.push(salesEntry);
+        
+        // Setup Receipt and Print
+        document.getElementById('r-plate').innerText = item.plate;
+        document.getElementById('r-in').innerText = item.timeIn;
+        document.getElementById('r-out').innerText = historyEntry.out;
+        document.getElementById('r-total').innerText = "TOTAL: ₱" + payment;
+        document.getElementById('receipt-box').style.display = 'block';
+        window.print();
+
+        activeParkers.splice(index, 1);
+        renderAll();
+    }
+
+    function renderAll() {
+        // Render Dashboard
+        const dashBody = document.getElementById('dashboard-table');
+        dashBody.innerHTML = activeParkers.map((p, i) => `
+            <tr>
+                <td>${p.plate}</td><td>${p.vehicle}</td><td>${p.timeIn}</td><td>--</td>
+                <td class="status-parked">${p.status}</td><td>${p.date}</td>
+                <td><button class="btn btn-checkout" onclick="checkOut(${i})">OUT</button></td>
+            </tr>
+        `).join('');
+
+        // Render History 
+        const historyBody = document.getElementById('history-table');
+        historyBody.innerHTML = historyLogs.map(p => `
+            <tr>
+                <td>${p.plate}</td><td>${p.vehicle}</td><td>${p.timeIn}</td><td>${p.out}</td>
+                <td class="status-unparked">${p.status}</td><td>${p.date}</td>
+            </tr>
+        `).join('');
+
+        // Render Sales 
+        const salesBody = document.getElementById('sales-table');
+        salesBody.innerHTML = salesLogs.map(s => `
+            <tr><td>${s.plate}</td><td>${s.hours}</td><td>${s.payment}</td><td>${s.date}</td></tr>
+        `).join('');
+    }
+</script>
+</body>
+</html>
