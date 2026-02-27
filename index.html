@@ -188,6 +188,12 @@
         salesBody.innerHTML = salesLogs.map(s => `
             <tr><td>${s.plate}</td><td>${s.hours}</td><td>${s.payment}</td><td>${s.date}</td></tr>
         `).join('');
+        // This function runs every time you add a bike or check one out
+function saveToDatabase() {
+    const dataString = JSON.stringify(activeParkers);
+    localStorage.setItem('parking_data', dataString);
+    console.log("Data saved to hard drive.");
+
     }
 </script>
 </body>
