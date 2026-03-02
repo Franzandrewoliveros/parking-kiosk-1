@@ -12,7 +12,6 @@
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
-        /* --- BACKGROUNDS --- */
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
@@ -46,12 +45,10 @@
         .btn-delete { background: #ff5252; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;}
         .btn-clear { background: var(--red-dark); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-bottom: 15px; font-weight: bold; float: right;}
 
-        /* --- SALES BAR --- */
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .total-bar { 
             background: var(--dark-bg); color: white; padding: 20px; 
             border-radius: 10px; display: flex; flex-direction: column; align-items: center;
-            border-bottom: 4px solid var(--red-main);
         }
 
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
@@ -86,12 +83,26 @@
     </div>
 </div>
 
+<div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
+    <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
+        <span style="font-weight: bold; color: var(--red-main);">METRO PLAZA KIOSK</span>
+        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; cursor:pointer; border-radius:5px; padding: 8px 15px; font-weight: bold;">← BACK TO SYSTEM</button>
+    </div>
+    <div style="text-align:center; color:white;">
+        <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
+        <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
+        <br>
+        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">CHECK-IN</button>
+        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold; height: 60px;"></div>
+    </div>
+</div>
+
 <div id="sidebar">
     <div class="sidebar-brand">
         <h2 style="margin:0;">METRO PLAZA</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
-    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">📡 CONNECT PRINTER</div>
+    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white; border-bottom: 2px solid #000;">📡 CONNECT PRINTER</div>
     <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
     <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
     <div class="nav-item admin-only" id="nav-sales" onclick="showTab('sale', this)">💰 SALES REPORT</div>
@@ -161,12 +172,41 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     let currentUserRole = "guard";
+    let printerCharacteristic = null;
 
-    // --- AUTH LOGIC ---
+    // --- BLUETOOTH PRINTING LOGIC ---
+    window.connectPrinter = async () => {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+            });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const characteristics = await service.getCharacteristics();
+            printerCharacteristic = characteristics.find(c => c.properties.write);
+            
+            document.getElementById('bt-status').innerText = "✅ PRINTER CONNECTED";
+            document.getElementById('bt-status').style.background = "#2e7d32";
+        } catch (e) { alert("Bluetooth Error: " + e.message); }
+    };
+
+    const printReceipt = async (text) => {
+        if (!printerCharacteristic) return false;
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\n\x1D\x56\x41');
+            await printerCharacteristic.writeValue(data);
+            return true;
+        } catch (e) { return false; }
+    };
+
+    // --- AUTH ---
     window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.loginAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = "admin"; loginSuccess("ADMIN MODE"); } else { alert("Access Denied"); } };
-    
+    window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; };
+
     function loginSuccess(tag) {
         document.getElementById('user-role-tag').innerText = tag;
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = (currentUserRole === "admin") ? 'block' : 'none');
@@ -175,20 +215,18 @@
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- DELETE LOGIC ---
-    window.deleteHistory = async (id) => { if(confirm("Delete this history record?")) await deleteDoc(doc(db, "parking_history", id)); };
-    window.deleteSale = async (id) => { if(confirm("Delete this sales record?")) await deleteDoc(doc(db, "sales_report", id)); };
-
-    window.clearCollection = async (colName) => {
-        if(!confirm(`Are you absolutely sure you want to delete ALL records in ${colName}?`)) return;
-        const snap = await getDocs(collection(db, colName));
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        alert("Records cleared.");
+    // --- CORE ACTIONS ---
+    window.kioskCheckIn = async () => {
+        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        if(!plate) return;
+        try {
+            await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
+            document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
+            document.getElementById('kioskPlate').value = "";
+            setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
+        } catch (e) { alert("Error"); }
     };
 
-    // --- CORE PARKING LOGIC ---
     window.checkOut = async (plate) => {
         const snap = await getDocs(collection(db, "active_parking"));
         const data = snap.docs.find(d => d.id === plate)?.data();
@@ -198,12 +236,54 @@
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
         const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
+        const receiptStr = `
+METRO PLAZA
+Bagong Silang Branch
+-------------------------
+PLATE:    ${plate}
+DATE:      ${new Date().toLocaleDateString()}
+TIME IN:  ${data.entryTime}
+TIME OUT: ${outTime}
+DURATION: ${hrs} hr(s)
+-------------------------
+TOTAL FEE: P${payment}.00
+-------------------------
+Thank you!
+        `;
+
+        const printed = await printReceipt(receiptStr);
+
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="padding: 20px; border: 2px solid black; display: inline-block; font-family: monospace; text-align: center;">
+                    <h2>METRO PLAZA</h2>
+                    <hr>
+                    <b>PLATE:</b> ${plate}<br>
+                    <b>TIME IN:</b> ${data.entryTime}<br>
+                    <b>TIME OUT:</b> ${outTime}<br>
+                    <hr>
+                    <h1>TOTAL: P${payment}.00</h1>
+                </div>`;
+            window.print();
+        }
+
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
         await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date });
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- REALTIME LISTENERS ---
+    // --- ADMIN ACTIONS ---
+    window.deleteHistory = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "parking_history", id)); };
+    window.deleteSale = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "sales_report", id)); };
+    window.clearCollection = async (col) => {
+        if(!confirm("Clear all records in " + col + "?")) return;
+        const s = await getDocs(collection(db, col));
+        const b = writeBatch(db);
+        s.forEach(d => b.delete(d.ref));
+        await b.commit();
+    };
+
+    // --- LISTENERS ---
     onSnapshot(collection(db, "active_parking"), snap => {
         document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
@@ -222,27 +302,24 @@
     onSnapshot(collection(db, "sales_report"), snap => {
         let grand = 0, todayTotal = 0;
         const todayStr = new Date().toLocaleDateString();
-        
         document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
-            const amt = Number(r.pay);
-            grand += amt;
-            if(r.date === todayStr) todayTotal += amt;
-            
-            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${amt}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="deleteSale('${doc.id}')">Delete</button></td></tr>`;
+            grand += Number(r.pay);
+            if(r.date === todayStr) todayTotal += Number(r.pay);
+            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="deleteSale('${doc.id}')">Delete</button></td></tr>`;
         }).reverse().join('');
-
         document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
         document.getElementById('today-total').innerText = "P" + todayTotal.toFixed(2);
     });
 
-    // --- UI UI ---
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
     };
+    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
+    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 </script>
 </body>
