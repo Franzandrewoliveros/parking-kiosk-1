@@ -2,88 +2,169 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Metro Plaza - Automated Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metro Plaza Bagong Silang - Management System</title>
     <style>
-        :root { --red: #d32f2f; --dark: #1a1a1a; --glass: rgba(255, 255, 255, 0.95); }
+        :root { 
+            --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
+            --glass: rgba(255, 255, 255, 0.95); --text-light: #f5f5f5;
+        }
+        
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
-        .parking-bg { position: fixed; inset: 0; z-index: 2500; background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2000'); background-size: cover; display: flex; justify-content: center; align-items: center; }
-        .glass-card { background: var(--glass); padding: 40px; border-radius: 20px; width: 380px; text-align: center; border-top: 5px solid var(--red); }
-        #sidebar { width: 280px; background: var(--dark); color: white; display: none; flex-direction: column; z-index: 10; }
-        .sidebar-brand { padding: 40px 25px; background: var(--red); text-align: center; }
-        .nav-item { padding: 18px 25px; cursor: pointer; border-bottom: 1px solid #2a2a2a; color: #aaa; }
-        .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red); }
-        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; }
+
+        /* --- BACKGROUNDS --- */
+        .parking-bg {
+            position: fixed; inset: 0; z-index: 2500;
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+                        url('https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2000');
+            background-size: cover; background-position: center;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .glass-card { 
+            background: var(--glass); padding: 40px; border-radius: 20px; 
+            width: 380px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border-top: 5px solid var(--red-main);
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar { width: 280px; background: var(--dark-bg); color: white; display: flex; flex-direction: column; z-index: 10; }
+        .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
+        .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; }
+        .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
+
+        /* --- MAIN CONTENT --- */
+        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        
+        /* --- TABLES --- */
         .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 15px; text-align: left; font-size: 0.75rem; border-bottom: 2px solid #eee; }
+        th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
-        .btn-release { background: var(--red); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; background: var(--dark); }
-        .kiosk-input { font-size: 5rem; width: 80%; max-width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red); text-align: center; font-weight: bold; margin-bottom: 20px; }
-        .admin-only { display: none; }
+        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        .btn-delete { background: #444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+
+        /* --- SALES TOTAL BAR --- */
+        .total-bar { 
+            background: var(--dark-bg); color: white; padding: 20px; 
+            border-radius: 10px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* --- KIOSK OVERLAY --- */
+        #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
+        .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
+        .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; transition: 0.3s; }
+        .kiosk-input.success { border-color: #4caf50; background: #e8f5e9; }
+
+        #print-area { display: none; }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { display: block; position: absolute; top: 0; width: 100%; text-align: center; } }
     </style>
 </head>
 <body>
 
 <div id="login-overlay" class="parking-bg">
     <div class="glass-card">
-        <h1 style="color:var(--red); margin:0;">METRO PLAZA</h1>
-        <p>ACCESS CONTROL</p>
-        <button onclick="enterGuard()" style="width:100%; padding:15px; background:#2e7d32; color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; margin-bottom:15px;">🛡️ GUARD ACCESS</button>
-        <button onclick="showAdminLogin()" style="width:100%; padding:15px; background:var(--red); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">🔑 ADMIN LOGIN</button>
+        <h1 style="color:var(--red-main); margin:0;">METRO PLAZA</h1>
+        <p style="margin-bottom:30px; color:#555; font-weight: bold;">ADMIN ACCESS</p>
+        <input type="password" id="pass" placeholder="Enter Access Code" 
+               style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; box-sizing: border-box; text-align: center; font-size: 1.1rem;">
+        <button onclick="login()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">SECURE LOGIN</button>
     </div>
 </div>
 
-<div id="kiosk-view" class="parking-bg">
-    <div style="text-align:center; color:white; width: 100%;">
-        <button onclick="exitKiosk()" style="position:absolute; top:20px; right:20px; background:var(--red); border:none; color:white; padding:10px 20px; border-radius:5px; cursor:pointer;">BACK TO SYSTEM</button>
-        <h1 style="font-size: 3rem;">WELCOME</h1>
-        <input type="text" id="kioskPlate" class="kiosk-input" placeholder="PLATE NO.">
+<div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
+    <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
+        <span style="font-weight: bold; color: var(--red-main);">METRO PLAZA KIOSK</span>
+        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; cursor:pointer; border-radius:5px; padding: 8px 15px; font-weight: bold;">← BACK TO ADMIN</button>
+    </div>
+    <div style="text-align:center; color:white;">
+        <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
+        <p style="font-size: 1.5rem; color: #ccc;">Enter Plate Number</p>
+        <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
         <br>
-        <button onclick="kioskCheckIn()" style="background:var(--red); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">PRINT TICKET</button>
-        <div id="kiosk-feedback" style="margin-top:20px; font-size: 1.5rem;"></div>
+        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">CHECK-IN</button>
+        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold; height: 60px;"></div>
     </div>
 </div>
 
 <div id="sidebar">
-    <div class="sidebar-brand"><h2>METRO PLAZA</h2><small id="role-tag">SYSTEM</small></div>
-    <div class="nav-item active" onclick="showTab('dash', this)">DASHBOARD</div>
-    <div class="nav-item" onclick="showTab('hist', this)">HISTORY</div>
-    <div class="nav-item admin-only" id="nav-sales" onclick="showTab('sale', this)">SALES</div>
-    <div class="nav-item" onclick="enterKiosk()" style="color:var(--red); font-weight:bold;">🖥️ OPEN KIOSK</div>
-    <div class="nav-item" id="btnConnect" onclick="connectPrinter()" style="color:#00e5ff; font-weight:bold;">🔵 PAIR PRINTER</div>
+    <div class="sidebar-brand">
+        <h2 style="margin:0;">METRO PLAZA</h2>
+        <small>MANAGEMENT SYSTEM</small>
+    </div>
+    <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
+    <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
+    <div class="nav-item" onclick="showTab('sale', this)">💰 SALES REPORT</div>
+    <div class="nav-item" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
+    <div id="btnConnect" class="nav-item" onclick="initBluetooth()" style="color:#00e5ff; font-weight:bold;">🔵 PAIR THERMAL PRINTER</div>
+    <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
 </div>
 
 <div id="main-content">
+    <div class="header-bar">
+        <h2 id="view-title" style="color:#333;">PARKING OVERVIEW</h2>
+        <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
+    </div>
+
     <div id="dash" class="tab-view table-container">
         <table>
-            <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>ACTION</th></tr></thead>
+            <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
             <tbody id="table-dash"></tbody>
         </table>
     </div>
+
+    <div id="hist" class="tab-view table-container" style="display:none">
+        <table>
+            <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <tbody id="table-hist"></tbody>
+        </table>
     </div>
+
+    <div id="sale" class="tab-view" style="display:none">
+        <div class="table-container">
+            <table>
+                <thead><tr><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
+                <tbody id="table-sale"></tbody>
+            </table>
+        </div>
+        <div class="total-bar">
+            <span style="font-size: 1.2rem; font-weight: bold;">GRAND TOTAL COLLECTION:</span>
+            <span id="grand-total" style="font-size: 1.5rem; font-weight: bold; color: var(--red-main);">P0.00</span>
+        </div>
+    </div>
+</div>
+
+<div id="print-area"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    const firebaseConfig = { /* YOUR FIREBASE CONFIG HERE */ };
+    const firebaseConfig = {
+        apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
+        authDomain: "metroplaza-13b5e.firebaseapp.com",
+        projectId: "metroplaza-13b5e",
+        storageBucket: "metroplaza-13b5e.firebasestorage.app",
+        messagingSenderId: "958136196486",
+        appId: "1:958136196486:web:28292dcd6cd5f2bbfae007"
+    };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    let printChar = null;
 
-    // ESC/POS Byte Commands for Senda 58mm
-    const PRINTER = {
+    // --- BLUETOOTH & 57mm PRINTER CONFIG ---
+    let printCharacteristic = null;
+    const ESC = {
         init: '\x1b\x40',
         center: '\x1b\x61\x01',
         left: '\x1b\x61\x00',
         bold: '\x1b\x45\x01',
-        regular: '\x1b\x45\x00',
-        feed: '\n\n\n\n'
+        boldOff: '\x1b\x45\x00',
+        feed: '\n\n\n'
     };
 
-    // 1. Bluetooth Connection (Must do this once after login)
-    window.connectPrinter = async () => {
+    window.initBluetooth = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
@@ -91,75 +172,122 @@
             });
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
-            printChar = await service.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
-            document.getElementById('btnConnect').innerText = "✅ PRINTER READY";
-        } catch (e) { alert("Bluetooth Error: " + e.message); }
+            printCharacteristic = await service.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
+            document.getElementById('btnConnect').innerText = "✅ PRINTER READY (57mm)";
+            document.getElementById('btnConnect').style.color = "#4caf50";
+        } catch (e) { alert("Pairing Error: " + e.message); }
     };
 
-    // 2. Automatic Printing Function
     async function autoPrint(text) {
-        if (!printChar) return console.warn("Printer not connected");
-        await printChar.writeValue(new TextEncoder().encode(text));
+        if (!printCharacteristic) return false;
+        const encoder = new TextEncoder();
+        await printCharacteristic.writeValue(encoder.encode(text));
+        return true;
     }
 
-    // 3. Kiosk Logic (Entry)
+    // --- UI LOGIC ---
+    window.login = () => { if(document.getElementById('pass').value === "0526") { document.getElementById('login-overlay').style.display = 'none'; } else { alert("Access Denied"); } };
+    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
+    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
+    setInterval(() => { const clock = document.getElementById('clock'); if(clock) clock.innerText = new Date().toLocaleString(); }, 1000);
+
+    // --- AUTOMATIC CHECK-IN PRINT ---
     window.kioskCheckIn = async () => {
-        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        const pInput = document.getElementById('kioskPlate');
+        const feedback = document.getElementById('kiosk-feedback');
+        const plate = pInput.value.trim().toUpperCase();
         if(!plate) return;
 
-        const entryTime = new Date().toLocaleTimeString();
-        await setDoc(doc(db, "active_parking", plate), {
-            plate, entryTime, rawIn: Date.now(), date: new Date().toLocaleDateString()
-        });
+        try {
+            const timeIn = new Date().toLocaleTimeString();
+            await setDoc(doc(db, "active_parking", plate), {
+                plate: plate, entryTime: timeIn,
+                rawIn: Date.now(), date: new Date().toLocaleDateString(), status: "PARKED"
+            });
+            
+            // 57mm Entry Ticket Logic
+            const ticketText = ESC.init + ESC.center + ESC.bold + "METRO PLAZA\n" +
+                               "ENTRY TICKET\n" + ESC.boldOff + "----------------\n" +
+                               ESC.left + `PLATE: ${plate}\n` +
+                               `IN:    ${timeIn}\n` +
+                               "----------------\n" + ESC.feed;
+            
+            await autoPrint(ticketText);
 
-        // AUTO PRINT TICKET
-        const ticket = PRINTER.init + PRINTER.center + PRINTER.bold + "METRO PLAZA\nENTRY TICKET\n" + 
-                       PRINTER.regular + "----------------\n" + 
-                       PRINTER.left + `PLATE: ${plate}\nTIME:  ${entryTime}\n` + 
-                       "----------------\n" + PRINTER.feed;
-        await autoPrint(ticket);
-        
-        document.getElementById('kioskPlate').value = "";
-        document.getElementById('kiosk-feedback').innerText = "✅ TICKET PRINTED";
-        setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 3000);
+            feedback.innerHTML = "<span style='color: #4caf50;'>✅ TICKET PRINTED</span>";
+            pInput.classList.add('success');
+            pInput.value = ""; 
+            setTimeout(() => { feedback.innerHTML = ""; pInput.classList.remove('success'); }, 3000);
+        } catch (e) { feedback.innerHTML = "❌ ERROR"; }
     };
 
-    // 4. Dashboard Logic (Automatic Print on Release)
+    // --- AUTOMATIC RELEASE PRINT ---
     window.checkOut = async (plate) => {
-        const snap = await getDocs(collection(db, "active_parking"));
-        const data = snap.docs.find(d => d.id === plate)?.data();
+        const activeSnap = await getDocs(collection(db, "active_parking"));
+        const data = activeSnap.docs.find(d => d.id === plate)?.data();
         if(!data) return;
 
         const outTime = new Date().toLocaleTimeString();
-        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        const fee = hrs > 3 ? 40 + ((hrs - 3) * 10) : 40; // Example: P40 base
+        const hrs = Math.ceil((Date.now() - data.rawIn) / (3600000));
+        const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
-        // AUTO PRINT RECEIPT
-        const receipt = PRINTER.init + PRINTER.center + PRINTER.bold + "METRO PLAZA\nOFFICIAL RECEIPT\n" + 
-                        PRINTER.regular + "----------------\n" +
-                        PRINTER.left + `PLATE: ${plate}\nIN:    ${data.entryTime}\nOUT:   ${outTime}\n` + 
-                        PRINTER.bold + `FEE:   PHP ${fee}.00\n` + PRINTER.regular +
-                        "----------------\n" + PRINTER.center + "DRIVE SAFELY\n" + PRINTER.feed;
-        await autoPrint(receipt);
+        // 57mm Receipt Logic
+        const receiptText = ESC.init + ESC.center + ESC.bold + "METRO PLAZA\n" +
+                            "RECEIPT\n" + ESC.boldOff + "----------------\n" +
+                            ESC.left + `PLATE: ${plate}\n` +
+                            `IN:    ${data.entryTime}\n` +
+                            `OUT:   ${outTime}\n` +
+                            `STAY:  ${hrs} hr(s)\n` +
+                            ESC.bold + `TOTAL: P${payment}.00\n` + ESC.boldOff +
+                            "----------------\n" + ESC.center + "THANK YOU!\n" + ESC.feed;
 
-        // Move to history/sales and delete from active
-        await addDoc(collection(db, "parking_history"), { ...data, out: outTime, fee });
+        const printed = await autoPrint(receiptText);
+        
+        // Fallback to Browser Print if Bluetooth fails
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `<pre>${receiptText}</pre>`;
+            window.print();
+        }
+
+        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
+        await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date });
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // Setup UI listeners
+    window.deleteHistory = async (id) => { if(confirm("Delete log?")) await deleteDoc(doc(db, "parking_history", id)); };
+    window.deleteSale = async (id) => { if(confirm("Delete sale?")) await deleteDoc(doc(db, "sales_report", id)); };
+
     onSnapshot(collection(db, "active_parking"), (snap) => {
         document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
-            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>PARKED</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+            if(!r.plate) return ""; 
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
         }).join('');
     });
 
-    // Helper UI functions
-    window.enterGuard = () => { document.getElementById('login-overlay').style.display='none'; document.getElementById('sidebar').style.display='flex'; document.getElementById('main-content').style.display='block'; };
-    window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
-    window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
-    window.showTab = (id, el) => { document.querySelectorAll('.tab-view').forEach(v => v.style.display='none'); document.getElementById(id).style.display='block'; };
+    onSnapshot(collection(db, "parking_history"), (snap) => {
+        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td><button class="btn-delete" onclick="deleteHistory('${doc.id}')">Delete</button></td></tr>`;
+        }).reverse().join('');
+    });
+
+    onSnapshot(collection(db, "sales_report"), (snap) => {
+        let total = 0;
+        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            total += Number(r.pay);
+            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="deleteSale('${doc.id}')">Delete</button></td></tr>`;
+        }).reverse().join('');
+        document.getElementById('grand-total').innerText = "P" + total + ".00";
+    });
+
+    window.showTab = (tabId, el) => {
+        document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
+        document.getElementById(tabId).style.display = 'block';
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+    };
 </script>
 </body>
 </html>
