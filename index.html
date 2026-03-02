@@ -12,6 +12,7 @@
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
+        /* --- BACKGROUNDS --- */
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
@@ -40,11 +41,10 @@
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
-        
-        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-right: 5px;}
-        .btn-delete { background: #444; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
-        .btn-clear-all { background: #b71c1c; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 15px; float: right; }
+        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        .btn-delete { background: #444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 
+        /* --- SALES BAR --- */
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .total-bar { 
             background: var(--dark-bg); color: white; padding: 20px; 
@@ -56,6 +56,12 @@
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
 
         .admin-only { display: none; }
+
+        @media print { 
+            body * { visibility: hidden; } 
+            #print-area, #print-area * { visibility: visible; } 
+            #print-area { position: absolute; top: 0; width: 100%; text-align: center; } 
+        }
     </style>
 </head>
 <body>
@@ -96,7 +102,8 @@
         <h2 style="margin:0;">METRO PLAZA</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
-    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">📡 CONNECT PRINTER</div>
+    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white; border-bottom: 2px solid #000;">📡 CONNECT PRINTER</div>
+    
     <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
     <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
     <div class="nav-item admin-only" id="nav-sales" onclick="showTab('sale', this)">💰 SALES REPORT</div>
@@ -117,19 +124,15 @@
         </table>
     </div>
 
-    <div id="hist" class="tab-view" style="display:none">
-        <button class="btn-clear-all admin-only" onclick="clearAllHistory()">🗑️ CLEAR ALL HISTORY</button>
-        <div class="table-container" style="clear: both;">
-            <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
-                <tbody id="table-hist"></tbody>
-            </table>
-        </div>
+    <div id="hist" class="tab-view table-container" style="display:none">
+        <table>
+            <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
+            <tbody id="table-hist"></tbody>
+        </table>
     </div>
 
     <div id="sale" class="tab-view admin-only" style="display:none">
-        <button class="btn-clear-all" onclick="clearAllSales()">💸 RESET SALES DATA</button>
-        <div class="table-container" style="clear: both;">
+        <div class="table-container">
             <table>
                 <thead><tr><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
                 <tbody id="table-sale"></tbody>
@@ -148,9 +151,11 @@
     </div>
 </div>
 
+<div id="print-area"></div>
+
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
@@ -164,20 +169,39 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     let currentUserRole = "guard";
+    let printerCharacteristic = null;
 
-    // --- BT PRINTER ---
+    // --- BLUETOOTH PRINTING LOGIC ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({
                 filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
                 optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
             });
-            await device.gatt.connect();
-            document.getElementById('bt-status').innerText = "✅ PRINTER READY";
-        } catch (e) { alert("Bluetooth Error"); }
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const characteristics = await service.getCharacteristics();
+            printerCharacteristic = characteristics.find(c => c.properties.write);
+            
+            document.getElementById('bt-status').innerText = "✅ PRINTER CONNECTED";
+            document.getElementById('bt-status').style.background = "#2e7d32";
+        } catch (e) {
+            alert("Bluetooth Error: " + e.message);
+        }
     };
 
-    // --- AUTH ---
+    const printReceipt = async (text) => {
+        if (!printerCharacteristic) {
+            alert("No printer connected! Falling back to screen print.");
+            return false;
+        }
+        const encoder = new TextEncoder();
+        // ESC/POS commands: Initialize (\x1B\x40), Bold (\x1B\x45\x01), Reset (\x1B\x45\x00), Cut (\x1D\x56\x41)
+        const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
+        await printerCharacteristic.writeValue(data);
+        return true;
+    };
+
     window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; };
@@ -191,86 +215,90 @@
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- CORE ---
+    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
+    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+
     window.kioskCheckIn = async () => {
-        const plateInput = document.getElementById('kioskPlate').value.trim().toUpperCase();
-        if(!plateInput) return;
-        await setDoc(doc(db, "active_parking", plateInput), { 
-            plate: plateInput, entryTime: new Date().toLocaleTimeString(), 
-            rawIn: Date.now(), date: new Date().toLocaleDateString() 
-        });
-        document.getElementById('kioskPlate').value = "";
+        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        if(!plate) return;
+        try {
+            await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
+            document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
+            document.getElementById('kioskPlate').value = "";
+            setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
+        } catch (e) { alert("Error"); }
     };
 
-    window.checkOut = async (pid) => {
+    window.checkOut = async (plate) => {
         const snap = await getDocs(collection(db, "active_parking"));
-        const target = snap.docs.find(d => d.id === pid);
-        if(!target) return;
-        const data = target.data();
+        const data = snap.docs.find(d => d.id === plate)?.data();
+        if(!data) return;
+        
         const outTime = new Date().toLocaleTimeString();
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
         const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
+        const receiptStr = `
+METRO PLAZA
+Bagong Silang Branch
+-------------------------
+PLATE:    ${plate}
+DATE:     ${new Date().toLocaleDateString()}
+TIME IN:  ${data.entryTime}
+TIME OUT: ${outTime}
+DURATION: ${hrs} hr(s)
+-------------------------
+TOTAL FEE: P${payment}.00
+-------------------------
+Please keep your receipt.
+Thank you!
+        `;
+
+        // Try Bluetooth First
+        const printed = await printReceipt(receiptStr);
+
+        // Fallback to Window Print if BT not available
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="padding: 20px; border: 2px solid black; display: inline-block; font-family: monospace; text-align: center;">
+                    <h2 style="margin:0;">METRO PLAZA</h2>
+                    <p>Bagong Silang Branch</p>
+                    <hr>
+                    <div style="text-align: left;">
+                        <b>PLATE NO:</b> ${plate}<br>
+                        <b>DATE:</b> ${new Date().toLocaleDateString()}<br>
+                        <b>TIME IN:</b> ${data.entryTime}<br>
+                        <b>TIME OUT:</b> ${outTime}<br>
+                        <b>DURATION:</b> ${hrs} hr(s)
+                    </div>
+                    <hr>
+                    <h1 style="margin: 5px 0;">TOTAL: P${payment}.00</h1>
+                    <p>Please keep this receipt.</p>
+                </div>`;
+            window.print();
+        }
+
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
-        await addDoc(collection(db, "sales_report"), { plate: data.plate || "EMPTY", pay: payment, date: data.date });
-        await deleteDoc(doc(db, "active_parking", pid));
+        await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date });
+        await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- FORCE REMOVE FROM DASHBOARD ---
-    window.forceDeleteActive = async (id) => {
-        if(confirm("Force delete this entry from Dashboard? (No history saved)")) {
-            await deleteDoc(doc(db, "active_parking", id));
-        }
-    };
+    window.deleteHistory = async (id) => { if(confirm("Delete record?")) await deleteDoc(doc(db, "parking_history", id)); };
+    window.deleteSale = async (id) => { if(confirm("Delete record?")) await deleteDoc(doc(db, "sales_report", id)); };
 
-    // --- ADMIN BATCH DELETE ---
-    window.clearAllHistory = async () => {
-        if(confirm("Wipe ALL history?")) {
-            const snap = await getDocs(collection(db, "parking_history"));
-            const batch = writeBatch(db);
-            snap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
-        }
-    };
-
-    window.clearAllSales = async () => {
-        if(confirm("Wipe ALL sales data?")) {
-            const snap = await getDocs(collection(db, "sales_report"));
-            const batch = writeBatch(db);
-            snap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
-        }
-    };
-
-    window.deleteHistory = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "parking_history", id)); };
-    window.deleteSale = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "sales_report", id)); };
-
-    // --- LISTENERS (FIXED FOR UNDEFINED/LONG STRINGS) ---
     onSnapshot(collection(db, "active_parking"), snap => {
         document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
-            // This logic cleans up the Plate column
-            const cleanPlate = (r.plate && r.plate.length < 15) ? r.plate : "EMPTY";
-            
-            return `<tr>
-                <td><b>${cleanPlate}</b></td>
-                <td>${r.entryTime || '---'}</td>
-                <td><span style="color:green">● PARKED</span></td>
-                <td>${r.date || '---'}</td>
-                <td>
-                    <button class="btn-release" onclick="checkOut('${doc.id}')">RELEASE</button>
-                    <button class="btn-delete admin-only" style="display:${currentUserRole==='admin'?'inline-block':'none'}" onclick="forceDeleteActive('${doc.id}')">FORCE DELETE</button>
-                </td>
-            </tr>`;
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
         }).join('');
     });
 
     onSnapshot(collection(db, "parking_history"), snap => {
         document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
-            const cleanPlate = (r.plate && r.plate.length < 15) ? r.plate : "EMPTY";
             const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="deleteHistory('${doc.id}')">Delete</button></td>` : "";
-            return `<tr><td>${cleanPlate}</td><td>${r.entryTime || '---'}</td><td>${r.out || '---'}</td><td>${r.date || '---'}</td>${action}</tr>`;
+            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
     });
 
@@ -279,26 +307,20 @@
         const todayStr = new Date().toLocaleDateString();
         document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
-            const payVal = Number(r.pay) || 0;
-            grand += payVal;
-            if(r.date === todayStr) todayTotal += payVal;
-            const cleanPlate = (r.plate && r.plate.length < 15) ? r.plate : "EMPTY";
-            return `<tr><td><b>${cleanPlate}</b></td><td style="color:red; font-weight:bold;">P${payVal}.00</td><td>${r.date || '---'}</td><td><button class="btn-delete" onclick="deleteSale('${doc.id}')">Delete</button></td></tr>`;
+            grand += Number(r.pay);
+            if(r.date === todayStr) todayTotal += Number(r.pay);
+            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="deleteSale('${doc.id}')">Delete</button></td></tr>`;
         }).reverse().join('');
         document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
         document.getElementById('today-total').innerText = "P" + todayTotal.toFixed(2);
     });
 
-    // --- UI NAVIGATION ---
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
     };
-    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
-    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 </script>
 </body>
 </html>
