@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metro Plaza Bagong Silang - Management System</title>
+    <title>Metro Plaza Bagong Silang - Parking System</title>
     <style>
         :root { 
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
@@ -17,7 +17,7 @@
         .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; font-weight: 500; }
         .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
 
-        /* --- MAIN CONTENT --- */
+        /* --- MAIN DASHBOARD --- */
         #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .search-input { width: 100%; padding: 12px 20px; border-radius: 8px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; outline: none; }
@@ -27,16 +27,14 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
 
-        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-release:hover { background: var(--red-dark); }
 
         /* --- LOGIN & KIOSK --- */
         .parking-bg { position: fixed; inset: 0; z-index: 2500; background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2000') center/cover; display: flex; justify-content: center; align-items: center; }
         .glass-card { background: var(--glass); padding: 40px; border-radius: 20px; width: 380px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; background: var(--dark-bg); color: white; align-items: center; justify-content: center; }
-        .kiosk-input { font-size: 4rem; width: 80%; max-width: 600px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
-
-        .admin-only, .guard-only { display: none; }
+        .kiosk-input { font-size: 4rem; width: 80%; max-width: 600px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; outline: none; }
     </style>
 </head>
 <body>
@@ -67,32 +65,29 @@
         <h2 style="margin:0;">METRO PLAZA</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
-    <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
-    <div class="nav-item guard-only" onclick="enterKiosk()" style="color:var(--red-main); margin-top:20px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
-    <div class="nav-item" onclick="connectBluetooth()" style="background:#222; color:#00e5ff; margin-top:10px; font-size: 0.8rem; border: 1px solid #333;">🔵 PAIR THERMAL PRINTER</div>
+    <div class="nav-item active">🔴 DASHBOARD</div>
+    <div class="nav-item" onclick="enterKiosk()" style="color:var(--red-main); margin-top:20px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
+    <div class="nav-item" id="btnConnect" onclick="connectPrinter()" style="background:#222; color:#00e5ff; margin-top:10px; font-size: 0.8rem; border: 1px solid #333;">🔵 PAIR THERMAL PRINTER</div>
     <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:var(--red-dark); color:white; text-align:center;">LOGOUT</div>
 </div>
 
 <div id="main-content">
     <div class="header-bar">
-        <h2 id="view-title">PARKING OVERVIEW</h2>
+        <h2>PARKING OVERVIEW</h2>
         <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
     </div>
-
-    <div id="dash" class="tab-view">
-        <input type="text" id="searchInput" class="search-input" placeholder="Search Plate Number..." onkeyup="filterTable()">
-        <div class="table-container">
-            <table>
-                <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
-                <tbody id="table-dash"></tbody>
-            </table>
-        </div>
+    <input type="text" class="search-input" placeholder="Search Plate Number...">
+    <div class="table-container">
+        <table>
+            <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <tbody id="table-dash"></tbody>
+        </table>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
@@ -105,24 +100,24 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    let currentUserRole = "guard";
     let printCharacteristic = null;
 
     // --- ACCESS LOGIC ---
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display='none'; document.getElementById('admin-login').style.display='block'; };
-    window.enterRole = (role) => { currentUserRole = role; loginSuccess(); };
-    window.verifyAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = 'admin'; loginSuccess(); } else { alert("Wrong PIN"); } };
+    window.enterRole = (role) => { loginSuccess(role); };
+    window.verifyAdmin = () => { if(document.getElementById('pass').value === "0526") loginSuccess('admin'); else alert("Wrong PIN"); };
 
-    function loginSuccess() {
-        document.getElementById('user-role-tag').innerText = currentUserRole.toUpperCase() + " MODE";
+    function loginSuccess(role) {
+        document.getElementById('user-role-tag').innerText = role.toUpperCase() + " MODE";
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- BLUETOOTH FIX ---
-    window.connectBluetooth = async () => {
+    // --- BLUETOOTH PRINTER LOGIC ---
+    window.connectPrinter = async () => {
         try {
+            // General filter to find all Bluetooth devices
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: ['0000ff00-0000-1000-8000-00805f9b34fb']
@@ -130,38 +125,66 @@
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
             printCharacteristic = await service.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
-            alert("Bluetooth Printer Connected! 🖨️");
-        } catch (e) { alert("Bluetooth Error: " + e.message); }
+            
+            document.getElementById('btnConnect').innerText = "✅ PRINTER READY";
+            alert("Senda Printer Connected!");
+        } catch (e) {
+            alert("Bluetooth Error: " + e.message);
+        }
     };
 
-    // --- DATA FIX (Filter undefined) ---
+    // --- DATA DISPLAY (Fixes "undefined" row) ---
     onSnapshot(collection(db, "active_parking"), snap => {
-        let h = "";
+        let html = "";
         snap.forEach(d => {
-            const r = d.data();
-            if(r.plate && r.plate !== "undefined" && r.plate !== "") {
-                h += `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+            const data = d.data();
+            // FILTER: Only show rows where the plate is a real value
+            if(data.plate && data.plate !== "undefined" && data.plate !== "") {
+                html += `<tr>
+                    <td><b>${data.plate}</b></td>
+                    <td>${data.entryTime}</td>
+                    <td><span style="color:green">● PARKED</span></td>
+                    <td>${data.date}</td>
+                    <td><button class="btn-release" onclick="checkOut('${data.plate}')">RELEASE</button></td>
+                </tr>`;
             }
         });
-        document.getElementById('table-dash').innerHTML = h;
+        document.getElementById('table-dash').innerHTML = html;
     });
 
     window.kioskCheckIn = async () => {
-        const p = document.getElementById('kioskPlate').value.trim().toUpperCase();
-        if(!p) return;
-        await setDoc(doc(db, "active_parking", p), { plate: p, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
+        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        if(!plate) return;
+        const entryTime = new Date().toLocaleTimeString();
+        const dateStr = new Date().toLocaleDateString();
+        
+        await setDoc(doc(db, "active_parking", plate), { 
+            plate: plate, 
+            entryTime: entryTime, 
+            date: dateStr,
+            rawIn: Date.now() 
+        });
+
+        // Auto-print receipt if printer is connected
+        if(printCharacteristic) {
+            const encoder = new TextEncoder();
+            const text = `\nMETRO PLAZA\nParking Receipt\n----------\nPLATE: ${plate}\nIN: ${entryTime}\nDATE: ${dateStr}\n----------\nKeep this ticket!\n\n\n`;
+            await printCharacteristic.writeValue(encoder.encode(text));
+        }
+
         document.getElementById('kioskPlate').value = "";
-        alert("Registered!");
+        alert("Vehicle Registered!");
     };
 
     window.checkOut = async (plate) => {
-        await deleteDoc(doc(db, "active_parking", plate));
-        alert("Vehicle Released");
+        if(confirm(`Release vehicle ${plate}?`)) {
+            await deleteDoc(doc(db, "active_parking", plate));
+        }
     };
 
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
-    setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleString(), 1000);
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 </script>
 </body>
 </html>
