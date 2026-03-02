@@ -32,7 +32,7 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; }
 
-        .btn-release { background: var(--green-guard); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-release { background: var(--green-guard); color: white; border: none; padding: 10px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-delete { color: var(--red-main); cursor: pointer; border: none; background: none; font-weight: bold; }
 
         /* --- LOGIN & KIOSK --- */
@@ -60,7 +60,7 @@
 
 <div id="kiosk-view">
     <h1 style="font-size: 2rem;">ENTRANCE KIOSK</h1>
-    <input type="text" id="kioskPlate" class="kiosk-input" placeholder="PLATE NO">
+    <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
     <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold; margin-top:20px;">PRINT TICKET</button>
     <button onclick="exitKiosk()" style="margin-top:40px; background:none; border:1px solid white; color:white; padding:10px 20px; cursor:pointer;">Close</button>
 </div>
@@ -125,13 +125,16 @@
     let printCharacteristic = null;
     let currentRole = 'guard';
 
-    // --- ACCESS CONTROL ---
+    // ESC/POS Commands for 58mm
+    const ESC = { init: '\x1b\x40', center: '\x1b\x61\x01', left: '\x1b\x61\x00', feed: '\n\n\n\n' };
+
+    // --- ACCESS LOGIC ---
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display='none'; document.getElementById('admin-login').style.display='block'; };
     window.enterRole = (role) => { currentRole = role; loginSuccess(); };
-    window.verifyAdmin = () => { if(document.getElementById('pass').value === "0526") { currentRole = 'admin'; loginSuccess(); } else { alert("Access Denied"); } };
+    window.verifyAdmin = () => { if(document.getElementById('pass').value === "0526") { currentRole = 'admin'; loginSuccess(); } else { alert("Wrong PIN"); } };
 
     function loginSuccess() {
-        document.getElementById('user-role-tag').innerText = currentRole.toUpperCase();
+        document.getElementById('user-role-tag').innerText = currentRole.toUpperCase() + " MODE";
         if(currentRole === 'admin') document.getElementById('admin-nav').style.display = 'block';
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
@@ -146,30 +149,27 @@
             const service = await server.getPrimaryService('0000ff00-0000-1000-8000-00805f9b34fb');
             printCharacteristic = await service.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
             document.getElementById('btnConnect').innerText = "✅ PRINTER READY";
-        } catch (e) { alert("Error: Use Chrome & turn on GPS/Location"); }
+            alert("Senda Printer Connected!");
+        } catch (e) { alert("Error: Use Chrome & Enable Location"); }
     };
 
-    // --- PRICING LOGIC (20 for 4hrs + 5/hr after) ---
+    // --- PRICE CALCULATION (₱20 for 4hrs + ₱5/hr after) ---
     function calculateParking(startTime) {
         const diffMs = Date.now() - startTime;
-        const totalMinutes = Math.floor(diffMs / (1000 * 60));
-        const totalHours = Math.ceil(totalMinutes / 60);
-        
-        let fee = 20; // First 4 hours
-        if (totalHours > 4) {
-            fee += (totalHours - 4) * 5; // 5 pesos for every extra hour
-        }
+        const totalHours = Math.ceil(diffMs / (1000 * 60 * 60));
+        let fee = 20; 
+        if (totalHours > 4) fee += (totalHours - 4) * 5;
         return { fee, hours: totalHours };
     }
 
-    // --- REAL-TIME DATA ---
+    // --- DATA HANDLING ---
     onSnapshot(collection(db, "active_parking"), snap => {
         let h = "";
         snap.forEach(d => {
             const r = d.data();
             if(r.plate && r.plate !== "undefined") {
                 h += `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td>
-                <td><button class="btn-release" onclick="checkOut('${r.plate}', ${r.rawIn})">RELEASE & PRINT</button></td></tr>`;
+                <td><button class="btn-release" onclick="checkOut('${r.plate}', ${r.rawIn})">RELEASE</button></td></tr>`;
             }
         });
         document.getElementById('table-dash').innerHTML = h;
@@ -190,23 +190,6 @@
         document.getElementById('grand-total').innerText = "₱" + total;
     });
 
-    // --- SEARCH FILTERS ---
-    window.filterDash = () => {
-        let val = document.getElementById('dashSearch').value.toUpperCase();
-        let rows = document.getElementById('table-dash').getElementsByTagName('tr');
-        for (let row of rows) {
-            row.style.display = row.innerText.toUpperCase().includes(val) ? "" : "none";
-        }
-    };
-
-    window.filterHistory = () => {
-        let val = document.getElementById('historySearch').value.toUpperCase();
-        let rows = document.getElementsByClassName('history-row');
-        for (let row of rows) {
-            row.style.display = row.innerText.toUpperCase().includes(val) ? "" : "none";
-        }
-    };
-
     // --- ACTIONS ---
     window.kioskCheckIn = async () => {
         const p = document.getElementById('kioskPlate').value.toUpperCase();
@@ -214,16 +197,18 @@
         const entry = { plate: p, entryTime: new Date().toLocaleTimeString(), date: new Date().toLocaleDateString(), rawIn: Date.now() };
         await setDoc(doc(db, "active_parking", p), entry);
         if(printCharacteristic) {
-            const text = `\nMETRO PLAZA\nENTRY TICKET\n----------\nPLATE: ${p}\nIN: ${entry.entryTime}\nDATE: ${entry.date}\n----------\nPLEASE DO NOT LOSE\n\n\n`;
-            await printCharacteristic.writeValue(new TextEncoder().encode(text));
+            const ticket = ESC.init + ESC.center + "METRO PLAZA\nBAGONG SILANG\n--------------------------------\nENTRY TICKET\n\n" + 
+                           ESC.left + `PLATE: ${p}\nDATE:  ${entry.date}\nTIME:  ${entry.entryTime}\n` + 
+                           "--------------------------------\n" + ESC.center + "PLEASE KEEP THIS TICKET\n" + ESC.feed;
+            await printCharacteristic.writeValue(new TextEncoder().encode(ticket));
         }
         document.getElementById('kioskPlate').value = "";
-        alert("Entry Printed!");
+        alert("Entry Registered & Printed!");
     };
 
     window.checkOut = async (plate, startTime) => {
         const calc = calculateParking(startTime);
-        const exitTime = new Date().toLocaleTimeString();
+        const exitTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dateStr = new Date().toLocaleDateString();
 
         if(confirm(`Release ${plate}?\nStay: ${calc.hours} hrs\nFee: ₱${calc.fee}`)) {
@@ -231,21 +216,33 @@
             await deleteDoc(doc(db, "active_parking", plate));
 
             if(printCharacteristic) {
-                const text = `\nMETRO PLAZA\nOFFICIAL RECEIPT\n----------\nPLATE: ${plate}\nDATE: ${dateStr}\nOUT: ${exitTime}\nSTAY: ${calc.hours} hrs\nTOTAL: PHP ${calc.fee}.00\n----------\nTHANK YOU!\n\n\n`;
-                await printCharacteristic.writeValue(new TextEncoder().encode(text));
+                const receipt = ESC.init + ESC.center + "METRO PLAZA\nBAGONG SILANG\n--------------------------------\nOFFICIAL RECEIPT\n\n" + 
+                                ESC.left + `PLATE:    ${plate}\nDATE:     ${dateStr}\nOUT:      ${exitTime}\nDURATION: ${calc.hours} hr(s)\n` + 
+                                "--------------------------------\n" + ESC.center + `TOTAL: PHP ${calc.fee}.00\n` + 
+                                "--------------------------------\nTHANK YOU! DRIVE SAFELY\n" + ESC.feed;
+                await printCharacteristic.writeValue(new TextEncoder().encode(receipt));
             }
         }
     };
 
-    window.deleteRecord = async (coll, id) => { if(confirm("Admin: Delete this sale record?")) await deleteDoc(doc(db, coll, id)); };
-
+    // --- UTILS ---
+    window.filterDash = () => {
+        let val = document.getElementById('dashSearch').value.toUpperCase();
+        let rows = document.getElementById('table-dash').getElementsByTagName('tr');
+        for (let row of rows) row.style.display = row.innerText.toUpperCase().includes(val) ? "" : "none";
+    };
+    window.filterHistory = () => {
+        let val = document.getElementById('historySearch').value.toUpperCase();
+        let rows = document.getElementsByClassName('history-row');
+        for (let row of rows) row.style.display = row.innerText.toUpperCase().includes(val) ? "" : "none";
+    };
+    window.deleteRecord = async (coll, id) => { if(confirm("Admin: Delete this sale?")) await deleteDoc(doc(db, coll, id)); };
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
     };
-
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
     setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleString(), 1000);
