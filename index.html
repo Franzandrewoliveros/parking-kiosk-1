@@ -42,7 +42,7 @@
         td { padding: 15px; border-bottom: 1px solid #eee; }
         
         .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        .btn-delete { background: #ff5252; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;}
+        .btn-delete { background: #444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
         .btn-clear { background: var(--red-dark); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-bottom: 15px; font-weight: bold; float: right;}
 
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
@@ -56,6 +56,7 @@
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
 
         .admin-only { display: none; }
+        .guard-only { display: none; }
 
         @media print { 
             body * { visibility: hidden; } 
@@ -106,7 +107,7 @@
     <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
     <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
     <div class="nav-item admin-only" id="nav-sales" onclick="showTab('sale', this)">💰 SALES REPORT</div>
-    <div class="nav-item" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
+    <div class="nav-item guard-only" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
     <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
 </div>
 
@@ -123,19 +124,17 @@
         </table>
     </div>
 
-    <div id="hist" class="tab-view" style="display:none">
+    <div id="hist" class="tab-view table-container" style="display:none">
         <button class="btn-clear admin-only" onclick="clearCollection('parking_history')">🗑️ CLEAR ALL HISTORY</button>
-        <div class="table-container" style="clear: both;">
-            <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
-                <tbody id="table-hist"></tbody>
-            </table>
-        </div>
+        <table>
+            <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
+            <tbody id="table-hist"></tbody>
+        </table>
     </div>
 
     <div id="sale" class="tab-view admin-only" style="display:none">
         <button class="btn-clear" onclick="clearCollection('sales_report')">💸 RESET SALES</button>
-        <div class="table-container" style="clear: both;">
+        <div class="table-container">
             <table>
                 <thead><tr><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
                 <tbody id="table-sale"></tbody>
@@ -174,7 +173,7 @@
     let currentUserRole = "guard";
     let printerCharacteristic = null;
 
-    // --- BLUETOOTH PRINTING LOGIC ---
+    // --- BLUETOOTH ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({
@@ -185,7 +184,6 @@
             const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
             const characteristics = await service.getCharacteristics();
             printerCharacteristic = characteristics.find(c => c.properties.write);
-            
             document.getElementById('bt-status').innerText = "✅ PRINTER CONNECTED";
             document.getElementById('bt-status').style.background = "#2e7d32";
         } catch (e) { alert("Bluetooth Error: " + e.message); }
@@ -195,7 +193,7 @@
         if (!printerCharacteristic) return false;
         try {
             const encoder = new TextEncoder();
-            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\n\x1D\x56\x41');
+            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
             await printerCharacteristic.writeValue(data);
             return true;
         } catch (e) { return false; }
@@ -210,12 +208,13 @@
     function loginSuccess(tag) {
         document.getElementById('user-role-tag').innerText = tag;
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = (currentUserRole === "admin") ? 'block' : 'none');
+        document.querySelectorAll('.guard-only').forEach(el => el.style.display = (currentUserRole === "guard") ? 'block' : 'none');
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- CORE ACTIONS ---
+    // --- CORE LOGIC ---
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
@@ -248,6 +247,7 @@ DURATION: ${hrs} hr(s)
 -------------------------
 TOTAL FEE: P${payment}.00
 -------------------------
+Please keep your receipt.
 Thank you!
         `;
 
@@ -256,13 +256,19 @@ Thank you!
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="padding: 20px; border: 2px solid black; display: inline-block; font-family: monospace; text-align: center;">
-                    <h2>METRO PLAZA</h2>
+                    <h2 style="margin:0;">METRO PLAZA</h2>
+                    <p>Bagong Silang Branch</p>
                     <hr>
-                    <b>PLATE:</b> ${plate}<br>
-                    <b>TIME IN:</b> ${data.entryTime}<br>
-                    <b>TIME OUT:</b> ${outTime}<br>
+                    <div style="text-align: left;">
+                        <b>PLATE NO:</b> ${plate}<br>
+                        <b>DATE:</b> ${new Date().toLocaleDateString()}<br>
+                        <b>TIME IN:</b> ${data.entryTime}<br>
+                        <b>TIME OUT:</b> ${outTime}<br>
+                        <b>DURATION:</b> ${hrs} hr(s)
+                    </div>
                     <hr>
-                    <h1>TOTAL: P${payment}.00</h1>
+                    <h1 style="margin: 5px 0;">TOTAL: P${payment}.00</h1>
+                    <p>Please keep this receipt.</p>
                 </div>`;
             window.print();
         }
@@ -272,21 +278,22 @@ Thank you!
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- ADMIN ACTIONS ---
-    window.deleteHistory = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "parking_history", id)); };
-    window.deleteSale = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "sales_report", id)); };
+    // --- ADMIN TOOLS ---
+    window.deleteHistory = async (id) => { if(confirm("Delete record?")) await deleteDoc(doc(db, "parking_history", id)); };
+    window.deleteSale = async (id) => { if(confirm("Delete record?")) await deleteDoc(doc(db, "sales_report", id)); };
     window.clearCollection = async (col) => {
-        if(!confirm("Clear all records in " + col + "?")) return;
+        if(!confirm("Clear ALL records in " + col + "?")) return;
         const s = await getDocs(collection(db, col));
         const b = writeBatch(db);
         s.forEach(d => b.delete(d.ref));
         await b.commit();
     };
 
-    // --- LISTENERS ---
+    // --- SNAPSHOTS ---
     onSnapshot(collection(db, "active_parking"), snap => {
         document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
+            if(!r.plate) return '';
             return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
         }).join('');
     });
