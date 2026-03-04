@@ -37,15 +37,15 @@
         
         .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;}
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; }
-        td { padding: 15px; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
+        td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         
         .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        .btn-delete { background: #444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .btn-delete { background: #444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
         .btn-restore { background: var(--green-guard); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-right: 5px;}
         .btn-clear { background: var(--red-dark); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         
-        .search-box { padding: 10px; border-radius: 8px; border: 1px solid #ddd; width: 250px; margin-bottom: 15px; }
+        .search-box { padding: 10px; border-radius: 8px; border: 1px solid #ddd; width: 200px; outline: none; }
 
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .total-bar { background: var(--dark-bg); color: white; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; }
@@ -60,6 +60,7 @@
         .dur-danger { background: var(--red-main); color: white; }
 
         .admin-only, .guard-only { display: none; }
+        .view-only-tag { color: #888; font-size: 0.7rem; font-style: italic; }
 
         @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
     </style>
@@ -76,24 +77,23 @@
 
     <div class="glass-card" id="admin-login" style="display:none;">
         <h1 style="color:var(--red-main); margin:0;">ADMIN LOGIN</h1>
-        <p style="margin-bottom:20px; color:#555;">Enter Secure PIN</p>
-        <input type="password" id="pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center; font-size: 1.1rem;">
-        <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem; margin-bottom:10px;">VERIFY</button>
-        <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline;">Go Back</button>
+        <input type="password" id="pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center;">
+        <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY</button>
+        <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
 </div>
 
 <div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
     <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
-        <span style="font-weight: bold; color: var(--red-main);">METRO PLAZA BAGONG SILANG KIOSK</span>
-        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; cursor:pointer; border-radius:5px; padding: 8px 15px; font-weight: bold;">← BACK TO SYSTEM</button>
+        <span>METRO PLAZA KIOSK</span>
+        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; padding: 8px 15px; border-radius:5px;">← BACK</button>
     </div>
     <div style="text-align:center; color:white;">
         <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
         <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
         <br>
-        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; cursor: pointer; font-weight: bold;">CHECK-IN</button>
-        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold; height: 60px;"></div>
+        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; font-weight: bold;">CHECK-IN</button>
+        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold;"></div>
     </div>
 </div>
 
@@ -102,11 +102,11 @@
         <h2 style="margin:0;">METRO PLAZA BAGONG SILANG</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
-    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white; border-bottom: 2px solid #000;">📡 CONNECT PRINTER</div>
+    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">📡 CONNECT PRINTER</div>
     <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
     <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
-    <div class="nav-item admin-only" id="nav-sales" onclick="showTab('sale', this)">💰 SALES REPORT</div>
-    <div class="nav-item admin-only" onclick="showTab('arch', this)" style="background: #263238; border-top: 1px solid #444;">♻️ RECYCLE BIN</div>
+    <div class="nav-item admin-only" onclick="showTab('sale', this)">💰 SALES REPORT</div>
+    <div class="nav-item admin-only" onclick="showTab('arch', this)" style="background: #263238;">♻️ RECYCLE BIN</div>
     <div class="nav-item guard-only" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
     <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
 </div>
@@ -125,22 +125,24 @@
     </div>
 
     <div id="hist" class="tab-view" style="display:none">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
-            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ ARCHIVE ALL HISTORY</button>
+            <input type="date" class="search-box" onchange="filterByDate('table-hist', this.value)" style="width: 160px;">
+            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ ARCHIVE ALL</button>
         </div>
         <div class="table-container">
             <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
+                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th>ACTION</th></tr></thead>
                 <tbody id="table-hist"></tbody>
             </table>
         </div>
     </div>
 
     <div id="sale" class="tab-view admin-only" style="display:none">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL SALES</button>
+            <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
+            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
         <div class="table-container">
             <table>
@@ -149,20 +151,14 @@
             </table>
         </div>
         <div class="sales-summary">
-            <div class="total-bar">
-                <span style="font-size: 0.9rem; opacity: 0.8;">TODAY'S COLLECTION</span>
-                <span id="today-total" style="font-size: 1.8rem; font-weight: bold; color: #4caf50;">P0.00</span>
-            </div>
-            <div class="total-bar">
-                <span style="font-size: 0.9rem; opacity: 0.8;">GRAND TOTAL (ALL TIME)</span>
-                <span id="grand-total" style="font-size: 1.8rem; font-weight: bold; color: var(--red-main);">P0.00</span>
-            </div>
+            <div class="total-bar"><span>TODAY'S COLLECTION</span><span id="today-total" style="font-size: 1.8rem; color: #4caf50;">P0.00</span></div>
+            <div class="total-bar"><span>GRAND TOTAL</span><span id="grand-total" style="font-size: 1.8rem; color: var(--red-main);">P0.00</span></div>
         </div>
     </div>
 
     <div id="arch" class="tab-view admin-only" style="display:none">
-        <h3 style="color: #555;">♻️ DELETED RECORDS (ARCHIVE)</h3>
-        <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">🧨 PERMANENTLY EMPTY BIN</button>
+        <h3 style="color: #555;">♻️ RECYCLE BIN</h3>
+        <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">🧨 EMPTY BIN</button>
         <div class="table-container">
             <table>
                 <thead><tr><th>PLATE</th><th>TYPE</th><th>DELETED AT</th><th>ACTION</th></tr></thead>
@@ -189,17 +185,14 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    let currentUserRole = "guard";
+    let currentUserRole = "guard"; 
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // --- BLUETOOTH & PRINTER ---
+    // --- BLUETOOTH ---
     window.connectPrinter = async () => {
         try {
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-            });
+            const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
             const characteristics = await service.getCharacteristics();
@@ -220,43 +213,34 @@
     };
 
     // --- AUTH ---
-    window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("GUARD MODE"); };
+    window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
-    window.loginAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = "admin"; loginSuccess("ADMIN MODE"); } else { alert("Access Denied"); } };
+    window.loginAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = "admin"; loginSuccess("🔑 ADMIN MODE"); } else { alert("Access Denied"); } };
     window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; };
 
     function loginSuccess(tag) {
+        // Crucial: Set role first
         document.getElementById('user-role-tag').innerText = tag;
+        
+        // Handle UI Visibility
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = (currentUserRole === "admin") ? 'block' : 'none');
         document.querySelectorAll('.guard-only').forEach(el => el.style.display = (currentUserRole === "guard") ? 'block' : 'none');
+        
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
+
+        // Re-render tables to apply permissions
+        renderHistory();
+        renderSales();
     }
 
-    // --- LOGIC FUNCTIONS ---
+    // --- LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        let colorClass = "dur-safe";
-        if (hrs >= 2 && hrs < 4) colorClass = "dur-warning";
-        if (hrs >= 4) colorClass = "dur-danger";
-        return { text: `${hrs}h ${mins}m`, css: colorClass };
+        return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe") };
     }
-
-    window.renderDash = () => {
-        document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
-            const dur = formatDuration(Date.now() - r.rawIn);
-            return `<tr>
-                <td><b>${r.plate}</b></td>
-                <td>${r.entryTime}</td>
-                <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
-                <td><span style="color:green">● PARKED</span></td>
-                <td>${r.date}</td>
-                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
-            </tr>`;
-        }).join('');
-    };
 
     window.checkOut = async (plate) => {
         const data = activeParkingCache.find(d => d.plate === plate);
@@ -265,11 +249,9 @@
         const hrsElapsed = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
         let payment = (hrsElapsed > 4) ? 20 + (hrsElapsed - 4) * 5 : 20;
 
-        const receiptStr = `\nMETRO PLAZA\nBagong Silang\n-------------------------\nPLATE: ${plate}\nDATE: ${new Date().toLocaleDateString()}\nTIME IN: ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrsElapsed} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
-        const printed = await printReceipt(receiptStr);
-
-        if (!printed) {
-            document.getElementById('print-area').innerHTML = `<div style="padding: 20px; border: 2px solid black; background:white;"><h2>METRO PLAZA</h2><p>Bagong Silang Branch</p><hr>PLATE: ${plate}<br>DATE: ${new Date().toLocaleDateString()}<br>TIME IN: ${data.entryTime}<br>TIME OUT: ${outTime}<hr><h1>TOTAL: P${payment}.00</h1></div>`;
+        const receiptStr = `\nMETRO PLAZA\nPLATE: ${plate}\nTOTAL: P${payment}.00\n`;
+        if (!(await printReceipt(receiptStr))) {
+            document.getElementById('print-area').innerHTML = `<div><h2>METRO PLAZA</h2>PLATE: ${plate}<h1>TOTAL: P${payment}.00</h1></div>`;
             window.print();
         }
 
@@ -289,13 +271,13 @@
     };
 
     window.archiveEntireCollection = async (colName) => {
-        if(!confirm(`Archive ALL records in ${colName}?`)) return;
+        if(!confirm(`Archive ALL in ${colName}?`)) return;
         const snap = await getDocs(collection(db, colName));
         const batch = writeBatch(db);
-        for (const d of snap.docs) {
-            await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: new Date().toLocaleString() });
+        snap.forEach(d => {
+            addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: new Date().toLocaleString() });
             batch.delete(d.ref);
-        }
+        });
         await batch.commit();
     };
 
@@ -303,79 +285,89 @@
         const docSnap = await getDoc(doc(db, "archive", id));
         if (docSnap.exists()) {
             const data = docSnap.data();
-            const targetCol = data.originalCol;
+            const col = data.originalCol;
             delete data.originalCol; delete data.deletedAt;
-            await addDoc(collection(db, targetCol), data);
+            await addDoc(collection(db, col), data);
             await deleteDoc(doc(db, "archive", id));
         }
     };
 
     window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
-    
-    window.clearCollection = async (col) => {
-        if(!confirm("EMPTY ENTIRE BIN?")) return;
-        const s = await getDocs(collection(db, col));
-        const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit();
-    };
+    window.clearCollection = async (col) => { if(confirm("EMPTY BIN?")) { const s = await getDocs(collection(db, col)); const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit(); }};
 
     // --- KIOSK ---
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
         await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
-        document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
+        document.getElementById('kiosk-feedback').innerText = "✅ SUCCESS!";
         document.getElementById('kioskPlate').value = "";
-        setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
+        setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 2000);
     };
+    window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
+    window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
 
-    // --- LIVE UPDATES ---
-    onSnapshot(collection(db, "active_parking"), snap => {
-        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        renderDash();
-    });
+    // --- RENDERING & SNAPSHOTS ---
+    let historySnap = [];
+    let salesSnap = [];
 
-    onSnapshot(collection(db, "parking_history"), snap => {
-        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${doc.id}')">Delete</button></td>` : "";
+    const renderHistory = () => {
+        document.getElementById('table-hist').innerHTML = historySnap.map(d => {
+            const r = d.data();
+            const action = (currentUserRole === 'admin') 
+                ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` 
+                : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
-    });
+    };
 
-    onSnapshot(collection(db, "sales_report"), snap => {
-        let grand = 0, today = 0; const todayStr = new Date().toLocaleDateString();
-        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            grand += Number(r.pay); if(r.date === todayStr) today += Number(r.pay);
-            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${doc.id}')">Delete</button></td></tr>`;
+    const renderSales = () => {
+        let g = 0, t = 0; const todayStr = new Date().toLocaleDateString();
+        document.getElementById('table-sale').innerHTML = salesSnap.map(d => {
+            const r = d.data(); g += Number(r.pay); if(r.date === todayStr) t += Number(r.pay);
+            const action = (currentUserRole === 'admin') 
+                ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` 
+                : `<td><span class="view-only-tag">View Only</span></td>`;
+            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
-        document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
-        document.getElementById('today-total').innerText = "P" + today.toFixed(2);
+        document.getElementById('grand-total').innerText = "P" + g.toFixed(2);
+        document.getElementById('today-total').innerText = "P" + t.toFixed(2);
+    };
+
+    onSnapshot(collection(db, "active_parking"), snap => {
+        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+        document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
+            const dur = formatDuration(Date.now() - r.rawIn);
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+        }).join('');
     });
 
+    onSnapshot(collection(db, "parking_history"), snap => { historySnap = snap.docs; renderHistory(); });
+    onSnapshot(collection(db, "sales_report"), snap => { salesSnap = snap.docs; renderSales(); });
     onSnapshot(collection(db, "archive"), snap => {
         document.getElementById('table-arch').innerHTML = snap.docs.map(doc => {
             const r = doc.data();
-            const type = r.originalCol === 'sales_report' ? '💰 SALE' : '📂 HISTORY';
-            return `<tr><td><b>${r.plate}</b></td><td>${type}</td><td>${r.deletedAt}</td><td><button class="btn-restore" onclick="restoreFromArchive('${doc.id}')">Restore</button><button class="btn-delete" onclick="finalDelete('${doc.id}')">X</button></td></tr>`;
+            return `<tr><td><b>${r.plate}</b></td><td>${r.originalCol.toUpperCase()}</td><td>${r.deletedAt}</td><td><button class="btn-restore" onclick="restoreFromArchive('${doc.id}')">Restore</button><button class="btn-delete" onclick="finalDelete('${doc.id}')">X</button></td></tr>`;
         }).reverse().join('');
     });
 
-    // --- UI UTILS ---
-    window.filterTable = (tableId, query) => {
-        const rows = document.querySelectorAll(`#${tableId} tr`);
-        rows.forEach(row => { row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none"; });
+    // --- UTILS ---
+    window.filterTable = (id, q) => document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none");
+    window.filterByDate = (id, val) => {
+        if(!val) return document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = "");
+        const [y, m, d] = val.split('-');
+        const fmt = `${parseInt(m)}/${parseInt(d)}/${y}`;
+        document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.includes(fmt) ? "" : "none");
     };
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
+        document.getElementById('view-title').innerText = el.innerText.trim();
     };
-    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
-    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
 
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); renderDash(); }, 1000);
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 </script>
 </body>
 </html>
