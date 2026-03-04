@@ -41,17 +41,14 @@
         td { padding: 15px; border-bottom: 1px solid #eee; }
         
         .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        .btn-delete { background: #d32f2f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .btn-delete { background: #444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
         .btn-restore { background: var(--green-guard); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-right: 5px;}
         .btn-clear { background: var(--red-dark); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         
         .search-box { padding: 10px; border-radius: 8px; border: 1px solid #ddd; width: 250px; margin-bottom: 15px; }
 
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-        .total-bar { 
-            background: var(--dark-bg); color: white; padding: 20px; 
-            border-radius: 10px; display: flex; flex-direction: column; align-items: center;
-        }
+        .total-bar { background: var(--dark-bg); color: white; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; }
 
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
@@ -62,14 +59,9 @@
         .dur-warning { background: var(--warning-orange); color: white; }
         .dur-danger { background: var(--red-main); color: white; }
 
-        .admin-only { display: none; }
-        .guard-only { display: none; }
+        .admin-only, .guard-only { display: none; }
 
-        @media print { 
-            body * { visibility: hidden; } 
-            #print-area, #print-area * { visibility: visible; } 
-            #print-area { position: absolute; top: 0; width: 100%; text-align: center; } 
-        }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
     </style>
 </head>
 <body>
@@ -107,8 +99,8 @@
 
 <div id="sidebar">
     <div class="sidebar-brand">
-        <h2 style="margin:0;">METRO PLAZA</h2>
-        <h2 style="margin:0;">BAGONG SILANG</h2>
+        <h2 style="margin:0;">METRO PLAZA</h2
+        <h2 style="margin:0;">BAGONG SILANG</h2>                                     
         <small id="user-role-tag">SYSTEM</small>
     </div>
     <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white; border-bottom: 2px solid #000;">📡 CONNECT PRINTER</div>
@@ -136,11 +128,11 @@
     <div id="hist" class="tab-view" style="display:none">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
-            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ DELETE ALL HISTORY</button>
+            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ ARCHIVE ALL HISTORY</button>
         </div>
         <div class="table-container">
             <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th>ACTION</th></tr></thead>
+                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
                 <tbody id="table-hist"></tbody>
             </table>
         </div>
@@ -149,7 +141,7 @@
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 DELETE ALL SALES</button>
+            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL SALES</button>
         </div>
         <div class="table-container">
             <table>
@@ -174,7 +166,7 @@
         <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">🧨 PERMANENTLY EMPTY BIN</button>
         <div class="table-container">
             <table>
-                <thead><tr><th>PLATE</th><th>TYPE</th><th>ORIGINAL DATE</th><th>ACTION</th></tr></thead>
+                <thead><tr><th>PLATE</th><th>TYPE</th><th>DELETED AT</th><th>ACTION</th></tr></thead>
                 <tbody id="table-arch"></tbody>
             </table>
         </div>
@@ -201,9 +193,8 @@
     let currentUserRole = "guard";
     let printerCharacteristic = null;
     let activeParkingCache = [];
-    let historyCache = [];
-    let salesCache = [];
 
+    // --- BLUETOOTH & PRINTER ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({
@@ -219,6 +210,17 @@
         } catch (e) { alert("Bluetooth Error: " + e.message); }
     };
 
+    const printReceipt = async (text) => {
+        if (!printerCharacteristic) return false;
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
+            await printerCharacteristic.writeValue(data);
+            return true;
+        } catch (e) { return false; }
+    };
+
+    // --- AUTH ---
     window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.loginAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = "admin"; loginSuccess("ADMIN MODE"); } else { alert("Access Denied"); } };
@@ -231,39 +233,55 @@
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
-        
-        // Force refresh table content to apply role-based buttons
-        renderHistory();
-        renderSales();
     }
 
-    // --- RENDER FUNCTIONS ---
-    function renderHistory() {
-        document.getElementById('table-hist').innerHTML = historyCache.map(r => {
-            const actionBtn = (currentUserRole === 'admin') 
-                ? `<button class="btn-delete" onclick="moveToArchive('parking_history', '${r.id}')">Delete</button>` 
-                : '';
-            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td>${actionBtn}</td></tr>`;
-        }).reverse().join('');
+    // --- LOGIC FUNCTIONS ---
+    function formatDuration(ms) {
+        const hrs = Math.floor(ms / (1000 * 60 * 60));
+        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        let colorClass = "dur-safe";
+        if (hrs >= 2 && hrs < 4) colorClass = "dur-warning";
+        if (hrs >= 4) colorClass = "dur-danger";
+        return { text: `${hrs}h ${mins}m`, css: colorClass };
     }
 
-    function renderSales() {
-        let grand = 0, todayTotal = 0; const todayStr = new Date().toLocaleDateString();
-        document.getElementById('table-sale').innerHTML = salesCache.map(r => {
-            grand += Number(r.pay); 
-            if(r.date === todayStr) todayTotal += Number(r.pay);
-            const actionBtn = (currentUserRole === 'admin') 
-                ? `<button class="btn-delete" onclick="moveToArchive('sales_report', '${r.id}')">Delete</button>` 
-                : '';
-            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td>${actionBtn}</td></tr>`;
-        }).reverse().join('');
-        document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
-        document.getElementById('today-total').innerText = "P" + todayTotal.toFixed(2);
-    }
+    window.renderDash = () => {
+        document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
+            const dur = formatDuration(Date.now() - r.rawIn);
+            return `<tr>
+                <td><b>${r.plate}</b></td>
+                <td>${r.entryTime}</td>
+                <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
+                <td><span style="color:green">● PARKED</span></td>
+                <td>${r.date}</td>
+                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
+            </tr>`;
+        }).join('');
+    };
 
-    // --- FIREBASE OPS ---
+    window.checkOut = async (plate) => {
+        const data = activeParkingCache.find(d => d.plate === plate);
+        if(!data) return;
+        const outTime = new Date().toLocaleTimeString();
+        const hrsElapsed = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
+        let payment = (hrsElapsed > 4) ? 20 + (hrsElapsed - 4) * 5 : 20;
+
+        const receiptStr = `\nMETRO PLAZA\nBagong Silang\n-------------------------\nPLATE: ${plate}\nDATE: ${new Date().toLocaleDateString()}\nTIME IN: ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrsElapsed} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
+        const printed = await printReceipt(receiptStr);
+
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `<div style="padding: 20px; border: 2px solid black; background:white;"><h2>METRO PLAZA</h2><p>Bagong Silang Branch</p><hr>PLATE: ${plate}<br>DATE: ${new Date().toLocaleDateString()}<br>TIME IN: ${data.entryTime}<br>TIME OUT: ${outTime}<hr><h1>TOTAL: P${payment}.00</h1></div>`;
+            window.print();
+        }
+
+        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
+        await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date });
+        await deleteDoc(doc(db, "active_parking", plate));
+    };
+
+    // --- ARCHIVE ENGINE ---
     window.moveToArchive = async (sourceCol, id) => {
-        if(!confirm("Move this record to Recycle Bin?")) return;
+        if(!confirm("Move to Recycle Bin?")) return;
         const docSnap = await getDoc(doc(db, sourceCol, id));
         if (docSnap.exists()) {
             await addDoc(collection(db, "archive"), { ...docSnap.data(), originalCol: sourceCol, deletedAt: new Date().toLocaleString() });
@@ -271,30 +289,94 @@
         }
     };
 
+    window.archiveEntireCollection = async (colName) => {
+        if(!confirm(`Archive ALL records in ${colName}?`)) return;
+        const snap = await getDocs(collection(db, colName));
+        const batch = writeBatch(db);
+        for (const d of snap.docs) {
+            await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: new Date().toLocaleString() });
+            batch.delete(d.ref);
+        }
+        await batch.commit();
+    };
+
+    window.restoreFromArchive = async (id) => {
+        const docSnap = await getDoc(doc(db, "archive", id));
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const targetCol = data.originalCol;
+            delete data.originalCol; delete data.deletedAt;
+            await addDoc(collection(db, targetCol), data);
+            await deleteDoc(doc(db, "archive", id));
+        }
+    };
+
+    window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
+    
+    window.clearCollection = async (col) => {
+        if(!confirm("EMPTY ENTIRE BIN?")) return;
+        const s = await getDocs(collection(db, col));
+        const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit();
+    };
+
+    // --- KIOSK ---
+    window.kioskCheckIn = async () => {
+        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        if(!plate) return;
+        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
+        document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
+        document.getElementById('kioskPlate').value = "";
+        setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
+    };
+
+    // --- LIVE UPDATES ---
+    onSnapshot(collection(db, "active_parking"), snap => {
+        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+        renderDash();
+    });
+
     onSnapshot(collection(db, "parking_history"), snap => {
-        historyCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderHistory();
+        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${doc.id}')">Delete</button></td>` : "";
+            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
+        }).reverse().join('');
     });
 
     onSnapshot(collection(db, "sales_report"), snap => {
-        salesCache = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderSales();
+        let grand = 0, today = 0; const todayStr = new Date().toLocaleDateString();
+        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            grand += Number(r.pay); if(r.date === todayStr) today += Number(r.pay);
+            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${doc.id}')">Delete</button></td></tr>`;
+        }).reverse().join('');
+        document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
+        document.getElementById('today-total').innerText = "P" + today.toFixed(2);
     });
 
-    // Dashboard & Kiosk listeners (unchanged but included)
-    onSnapshot(collection(db, "active_parking"), snap => { activeParkingCache = snap.docs.map(doc => doc.data()); renderDash(); });
-    window.renderDash = () => {
-        document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>---</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`).join('');
-    };
+    onSnapshot(collection(db, "archive"), snap => {
+        document.getElementById('table-arch').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            const type = r.originalCol === 'sales_report' ? '💰 SALE' : '📂 HISTORY';
+            return `<tr><td><b>${r.plate}</b></td><td>${type}</td><td>${r.deletedAt}</td><td><button class="btn-restore" onclick="restoreFromArchive('${doc.id}')">Restore</button><button class="btn-delete" onclick="finalDelete('${doc.id}')">X</button></td></tr>`;
+        }).reverse().join('');
+    });
 
-    // --- OTHER UI UTILS ---
+    // --- UI UTILS ---
+    window.filterTable = (tableId, query) => {
+        const rows = document.querySelectorAll(`#${tableId} tr`);
+        rows.forEach(row => { row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none"; });
+    };
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
     };
+    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
+    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
 
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); renderDash(); }, 1000);
 </script>
 </body>
 </html>
