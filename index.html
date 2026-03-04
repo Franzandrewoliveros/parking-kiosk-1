@@ -59,11 +59,10 @@
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
 
-        /* Duration Color Codes */
         .duration-badge { font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; display: inline-block; }
-        .dur-safe { background: var(--green-guard); color: white; } /* 0-2 Hours */
-        .dur-warning { background: var(--warning-orange); color: white; } /* 2-4 Hours */
-        .dur-danger { background: var(--red-main); color: white; } /* 4+ Hours */
+        .dur-safe { background: var(--green-guard); color: white; }
+        .dur-warning { background: var(--warning-orange); color: white; }
+        .dur-danger { background: var(--red-main); color: white; }
 
         .admin-only { display: none; }
         .guard-only { display: none; }
@@ -136,22 +135,22 @@
     </div>
 
     <div id="hist" class="tab-view" style="display:none">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
-            <button class="btn-clear admin-only" onclick="archiveAll('parking_history')">🗑️ ARCHIVE ALL HISTORY</button>
+            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ DELETE ALL HISTORY</button>
         </div>
         <div class="table-container">
             <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
+                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th>ACTION</th></tr></thead>
                 <tbody id="table-hist"></tbody>
             </table>
         </div>
     </div>
 
     <div id="sale" class="tab-view admin-only" style="display:none">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <button class="btn-clear" onclick="archiveAll('sales_report')">💸 ARCHIVE ALL SALES</button>
+            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 DELETE ALL SALES</button>
         </div>
         <div class="table-container">
             <table>
@@ -204,7 +203,7 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // --- BLUETOOTH & PRINTING ---
+    // --- BLUETOOTH ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({
@@ -245,31 +244,18 @@
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- DURATION & PRICING LOGIC ---
+    // --- LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        
-        // Color coding logic
-        let colorClass = "dur-safe";
-        if (hrs >= 2 && hrs < 4) colorClass = "dur-warning";
-        if (hrs >= 4) colorClass = "dur-danger";
-
+        let colorClass = hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe");
         return { text: `${hrs}h ${mins}m`, css: colorClass };
     }
 
     window.renderDash = () => {
         document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
             const dur = formatDuration(Date.now() - r.rawIn);
-            
-            return `<tr>
-                <td><b>${r.plate}</b></td>
-                <td>${r.entryTime}</td>
-                <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
-                <td><span style="color:green">● PARKED</span></td>
-                <td>${r.date}</td>
-                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
-            </tr>`;
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
         }).join('');
     };
 
@@ -277,20 +263,11 @@
         const data = activeParkingCache.find(d => d.plate === plate);
         if(!data) return;
         const outTime = new Date().toLocaleTimeString();
-        
-        // Progressive Pricing Logic: Round up to nearest hour
         const hrsElapsed = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        
-        // Base fee P20 (up to 4 hours), then P5 per additional hour
-        let payment = 20;
-        if (hrsElapsed > 4) {
-            payment += (hrsElapsed - 4) * 5;
-        }
+        let payment = hrsElapsed > 4 ? 20 + (hrsElapsed - 4) * 5 : 20;
 
-        const receiptStr = `\nMETRO PLAZA\nBagong Silang\n-------------------------\nPLATE:    ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:   ${data.entryTime}\nTIME OUT:  ${outTime}\nDURATION:  ${hrsElapsed} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
-        const printed = await printReceipt(receiptStr);
-
-        if (!printed) {
+        const receiptStr = `\nMETRO PLAZA\nBagong Silang\n-------------------------\nPLATE: ${plate}\nDATE: ${new Date().toLocaleDateString()}\nTIME IN: ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrsElapsed} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
+        if (!(await printReceipt(receiptStr))) {
             document.getElementById('print-area').innerHTML = `<div style="padding: 20px; border: 2px solid black; display: inline-block; font-family: monospace; text-align: center; background:white;"><h2>METRO PLAZA</h2><p>Bagong Silang Branch</p><hr><div style="text-align: left;"><b>PLATE NO:</b> ${plate}<br><b>DATE:</b> ${new Date().toLocaleDateString()}<br><b>TIME IN:</b> ${data.entryTime}<br><b>TIME OUT:</b> ${outTime}</div><hr><h1>TOTAL: P${payment}.00</h1></div>`;
             window.print();
         }
@@ -300,52 +277,16 @@
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- CORE KIOSK & DB SNAPSHOTS ---
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
-        try {
-            await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
-            document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
-            document.getElementById('kioskPlate').value = "";
-            setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
-        } catch (e) { alert("Error"); }
+        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
+        document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
+        document.getElementById('kioskPlate').value = "";
+        setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
     };
 
-    onSnapshot(collection(db, "active_parking"), snap => {
-        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        renderDash();
-    });
-
-    onSnapshot(collection(db, "parking_history"), snap => {
-        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${doc.id}')">Delete</button></td>` : "";
-            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
-        }).reverse().join('');
-    });
-
-    onSnapshot(collection(db, "sales_report"), snap => {
-        let grand = 0, todayTotal = 0;
-        const todayStr = new Date().toLocaleDateString();
-        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            grand += Number(r.pay); if(r.date === todayStr) todayTotal += Number(r.pay);
-            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${doc.id}')">Delete</button></td></tr>`;
-        }).reverse().join('');
-        document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
-        document.getElementById('today-total').innerText = "P" + todayTotal.toFixed(2);
-    });
-
-    onSnapshot(collection(db, "archive"), snap => {
-        document.getElementById('table-arch').innerHTML = snap.docs.map(doc => {
-            const r = doc.data();
-            const type = r.originalCol === 'sales_report' ? '💰 SALE' : '📂 HISTORY';
-            return `<tr><td><b>${r.plate}</b></td><td>${type}</td><td>${r.date}</td><td><button class="btn-restore" onclick="restoreFromArchive('${doc.id}')">Restore</button><button class="btn-delete" onclick="finalDelete('${doc.id}')">X</button></td></tr>`;
-        }).reverse().join('');
-    });
-
-    // --- UTILS & NAVIGATION ---
+    // --- DELETION UTILS ---
     window.moveToArchive = async (sourceCol, id) => {
         const docSnap = await getDoc(doc(db, sourceCol, id));
         if (docSnap.exists()) {
@@ -353,6 +294,20 @@
             await deleteDoc(doc(db, sourceCol, id));
         }
     };
+
+    window.archiveEntireCollection = async (colName) => {
+        const confirmMsg = colName === 'parking_history' ? "Archive all history records?" : "Archive all sales records?";
+        if (!confirm(confirmMsg)) return;
+        const querySnapshot = await getDocs(collection(db, colName));
+        const batch = writeBatch(db);
+        querySnapshot.forEach((docSnap) => {
+            batch.set(doc(collection(db, "archive")), { ...docSnap.data(), originalCol: colName, deletedAt: new Date().toLocaleString() });
+            batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+        alert("Moved to Recycle Bin.");
+    };
+
     window.restoreFromArchive = async (id) => {
         const docSnap = await getDoc(doc(db, "archive", id));
         if (docSnap.exists()) {
@@ -363,15 +318,41 @@
             await deleteDoc(doc(db, "archive", id));
         }
     };
+
     window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
     window.clearCollection = async (col) => {
         if(!confirm(`PERMANENTLY empty ${col}?`)) return;
         const s = await getDocs(collection(db, col));
         const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit();
     };
+
+    // --- LISTENERS ---
+    onSnapshot(collection(db, "active_parking"), snap => { activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate); renderDash(); });
+    onSnapshot(collection(db, "parking_history"), snap => {
+        document.getElementById('table-hist').innerHTML = snap.docs.map(doc => {
+            const r = doc.data();
+            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('parking_history', '${doc.id}')">Delete</button></td></tr>`;
+        }).reverse().join('');
+    });
+    onSnapshot(collection(db, "sales_report"), snap => {
+        let grand = 0, todayTotal = 0; const todayStr = new Date().toLocaleDateString();
+        document.getElementById('table-sale').innerHTML = snap.docs.map(doc => {
+            const r = doc.data(); grand += Number(r.pay); if(r.date === todayStr) todayTotal += Number(r.pay);
+            return `<tr><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${doc.id}')">Delete</button></td></tr>`;
+        }).reverse().join('');
+        document.getElementById('grand-total').innerText = "P" + grand.toFixed(2);
+        document.getElementById('today-total').innerText = "P" + todayTotal.toFixed(2);
+    });
+    onSnapshot(collection(db, "archive"), snap => {
+        document.getElementById('table-arch').innerHTML = snap.docs.map(doc => {
+            const r = doc.data(); const type = r.originalCol === 'sales_report' ? '💰 SALE' : '📂 HISTORY';
+            return `<tr><td><b>${r.plate}</b></td><td>${type}</td><td>${r.date}</td><td><button class="btn-restore" onclick="restoreFromArchive('${doc.id}')">Restore</button><button class="btn-delete" onclick="finalDelete('${doc.id}')">X</button></td></tr>`;
+        }).reverse().join('');
+    });
+
+    // --- UI UTILS ---
     window.filterTable = (tableId, query) => {
-        const rows = document.querySelectorAll(`#${tableId} tr`);
-        rows.forEach(row => { row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none"; });
+        document.querySelectorAll(`#${tableId} tr`).forEach(row => { row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none"; });
     };
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
@@ -382,10 +363,7 @@
     window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
     window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
     
-    setInterval(() => { 
-        document.getElementById('clock').innerText = new Date().toLocaleString(); 
-        renderDash(); 
-    }, 1000); 
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); renderDash(); }, 1000);
 
 </script>
 </body>
