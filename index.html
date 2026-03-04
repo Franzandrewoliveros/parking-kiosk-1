@@ -8,6 +8,7 @@
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
             --glass: rgba(255, 255, 255, 0.95); --text-light: #f5f5f5;
             --green-guard: #2e7d32; --blue-archive: #1976d2;
+            --warning-orange: #ef6c00;
         }
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
@@ -57,6 +58,12 @@
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
+
+        /* Duration Color Codes */
+        .duration-badge { font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; display: inline-block; }
+        .dur-safe { background: var(--green-guard); color: white; } /* 0-2 Hours */
+        .dur-warning { background: var(--warning-orange); color: white; } /* 2-4 Hours */
+        .dur-danger { background: var(--red-main); color: white; } /* 4+ Hours */
 
         .admin-only { display: none; }
         .guard-only { display: none; }
@@ -123,7 +130,7 @@
 
     <div id="dash" class="tab-view table-container">
         <table>
-            <thead><tr><th>PLATE</th><th>TIME IN</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <thead><tr><th>PLATE</th><th>TIME IN</th><th>DURATION</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
             <tbody id="table-dash"></tbody>
         </table>
     </div>
@@ -195,6 +202,7 @@
     const db = getFirestore(app);
     let currentUserRole = "guard";
     let printerCharacteristic = null;
+    let activeParkingCache = [];
 
     // --- BLUETOOTH & PRINTING ---
     window.connectPrinter = async () => {
@@ -222,42 +230,6 @@
         } catch (e) { return false; }
     };
 
-    // --- ARCHIVE LOGIC ---
-    window.moveToArchive = async (sourceCol, id) => {
-        const docRef = doc(db, sourceCol, id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            await addDoc(collection(db, "archive"), { 
-                ...docSnap.data(), 
-                originalCol: sourceCol, 
-                deletedAt: new Date().toLocaleString() 
-            });
-            await deleteDoc(docRef);
-        }
-    };
-
-    window.restoreFromArchive = async (id) => {
-        const docRef = doc(db, "archive", id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const targetCol = data.originalCol;
-            delete data.originalCol;
-            delete data.deletedAt;
-            await addDoc(collection(db, targetCol), data);
-            await deleteDoc(docRef);
-        }
-    };
-
-    window.archiveAll = async (col) => {
-        if(!confirm(`Move all ${col} records to Recycle Bin?`)) return;
-        const s = await getDocs(collection(db, col));
-        for (const d of s.docs) {
-            await addDoc(collection(db, "archive"), { ...d.data(), originalCol: col, deletedAt: new Date().toLocaleString() });
-            await deleteDoc(d.ref);
-        }
-    };
-
     // --- AUTH ---
     window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
@@ -273,28 +245,49 @@
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- CORE ---
-    window.kioskCheckIn = async () => {
-        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
-        if(!plate) return;
-        try {
-            await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
-            document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
-            document.getElementById('kioskPlate').value = "";
-            setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
-        } catch (e) { alert("Error"); }
+    // --- DURATION & PRICING LOGIC ---
+    function formatDuration(ms) {
+        const hrs = Math.floor(ms / (1000 * 60 * 60));
+        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        
+        // Color coding logic
+        let colorClass = "dur-safe";
+        if (hrs >= 2 && hrs < 4) colorClass = "dur-warning";
+        if (hrs >= 4) colorClass = "dur-danger";
+
+        return { text: `${hrs}h ${mins}m`, css: colorClass };
+    }
+
+    window.renderDash = () => {
+        document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
+            const dur = formatDuration(Date.now() - r.rawIn);
+            
+            return `<tr>
+                <td><b>${r.plate}</b></td>
+                <td>${r.entryTime}</td>
+                <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
+                <td><span style="color:green">● PARKED</span></td>
+                <td>${r.date}</td>
+                <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
+            </tr>`;
+        }).join('');
     };
 
     window.checkOut = async (plate) => {
-        const snap = await getDocs(collection(db, "active_parking"));
-        const data = snap.docs.find(d => d.id === plate)?.data();
+        const data = activeParkingCache.find(d => d.plate === plate);
         if(!data) return;
         const outTime = new Date().toLocaleTimeString();
-        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
+        
+        // Progressive Pricing Logic: Round up to nearest hour
+        const hrsElapsed = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
+        
+        // Base fee P20 (up to 4 hours), then P5 per additional hour
+        let payment = 20;
+        if (hrsElapsed > 4) {
+            payment += (hrsElapsed - 4) * 5;
+        }
 
-        // "Please keep receipt" REMOVED BELOW
-        const receiptStr = `\nMETRO PLAZA\nBagong Silang Branch\n-------------------------\nPLATE:    ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:  ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
+        const receiptStr = `\nMETRO PLAZA\nBagong Silang\n-------------------------\nPLATE:    ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:   ${data.entryTime}\nTIME OUT:  ${outTime}\nDURATION:  ${hrsElapsed} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
         const printed = await printReceipt(receiptStr);
 
         if (!printed) {
@@ -307,12 +300,21 @@
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- SNAPSHOTS ---
+    // --- CORE KIOSK & DB SNAPSHOTS ---
+    window.kioskCheckIn = async () => {
+        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        if(!plate) return;
+        try {
+            await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
+            document.getElementById('kiosk-feedback').innerHTML = "<span style='color: #4caf50;'>✅ SUCCESS!</span>";
+            document.getElementById('kioskPlate').value = "";
+            setTimeout(() => document.getElementById('kiosk-feedback').innerHTML = "", 2000);
+        } catch (e) { alert("Error"); }
+    };
+
     onSnapshot(collection(db, "active_parking"), snap => {
-        document.getElementById('table-dash').innerHTML = snap.docs.map(doc => {
-            const r = doc.data(); if(!r.plate) return '';
-            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
-        }).join('');
+        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+        renderDash();
     });
 
     onSnapshot(collection(db, "parking_history"), snap => {
@@ -343,10 +345,27 @@
         }).reverse().join('');
     });
 
-    // --- UTILS ---
+    // --- UTILS & NAVIGATION ---
+    window.moveToArchive = async (sourceCol, id) => {
+        const docSnap = await getDoc(doc(db, sourceCol, id));
+        if (docSnap.exists()) {
+            await addDoc(collection(db, "archive"), { ...docSnap.data(), originalCol: sourceCol, deletedAt: new Date().toLocaleString() });
+            await deleteDoc(doc(db, sourceCol, id));
+        }
+    };
+    window.restoreFromArchive = async (id) => {
+        const docSnap = await getDoc(doc(db, "archive", id));
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const targetCol = data.originalCol;
+            delete data.originalCol; delete data.deletedAt;
+            await addDoc(collection(db, targetCol), data);
+            await deleteDoc(doc(db, "archive", id));
+        }
+    };
     window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
     window.clearCollection = async (col) => {
-        if(!confirm(`PERMANENTLY empty ${col}? This cannot be undone.`)) return;
+        if(!confirm(`PERMANENTLY empty ${col}?`)) return;
         const s = await getDocs(collection(db, col));
         const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit();
     };
@@ -362,7 +381,12 @@
     };
     window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; document.getElementById('kioskPlate').focus(); };
     window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+    
+    setInterval(() => { 
+        document.getElementById('clock').innerText = new Date().toLocaleString(); 
+        renderDash(); 
+    }, 1000); 
+
 </script>
 </body>
 </html>
