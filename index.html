@@ -293,8 +293,8 @@
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
         const payment = hrs > 4 ? 20 + ((hrs - 4) * 5) : 20;
 
-        // "Please keep receipt" REMOVED BELOW
-        const receiptStr = `\nMETRO PLAZ\nBagong Silang Branch\n-------------------------\nPLATE:    ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:  ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
+        // "Please keep receipt" 
+        const receiptStr = `\nMETRO PLAZA\nBagong Silang Branch\n-------------------------\nPLATE:    ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:  ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!Ride Safe\n \n`;
         const printed = await printReceipt(receiptStr);
 
         if (!printed) {
