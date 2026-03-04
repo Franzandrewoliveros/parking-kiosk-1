@@ -189,7 +189,7 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // --- BLUETOOTH ---
+    // --- PRINTER ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
@@ -219,39 +219,44 @@
     window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; };
 
     function loginSuccess(tag) {
-        // Crucial: Set role first
         document.getElementById('user-role-tag').innerText = tag;
-        
-        // Handle UI Visibility
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = (currentUserRole === "admin") ? 'block' : 'none');
         document.querySelectorAll('.guard-only').forEach(el => el.style.display = (currentUserRole === "guard") ? 'block' : 'none');
-        
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
-
-        // Re-render tables to apply permissions
         renderHistory();
         renderSales();
     }
 
-    // --- LOGIC ---
+    // --- CORE LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe") };
+        return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe"), rawHrs: hrs };
     }
 
     window.checkOut = async (plate) => {
         const data = activeParkingCache.find(d => d.plate === plate);
         if(!data) return;
+        
         const outTime = new Date().toLocaleTimeString();
         const hrsElapsed = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        let payment = (hrsElapsed > 4) ? 20 + (hrsElapsed - 4) * 5 : 20;
+        const hrs = Math.max(1, hrsElapsed); 
+        let payment = (hrs > 4) ? 20 + (hrs - 4) * 5 : 20;
 
-        const receiptStr = `\nMETRO PLAZA\nPLATE: ${plate}\nTOTAL: P${payment}.00\n`;
-        if (!(await printReceipt(receiptStr))) {
-            document.getElementById('print-area').innerHTML = `<div><h2>METRO PLAZA</h2>PLATE: ${plate}<h1>TOTAL: P${payment}.00</h1></div>`;
+        // UPDATED RECEIPT
+        const receiptStr = `\nMETRO PLAZA\nBagong Silang Branch\n-------------------------\nPLATE:    ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:   ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\nThank you!\n`;
+        
+        const printed = await printReceipt(receiptStr);
+        
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
+                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
+                    <div style="text-align:left;">PLATE: ${plate}<br>DATE: ${new Date().toLocaleDateString()}<br>TIME IN: ${data.entryTime}<br>TIME OUT: ${outTime}<br>DURATION: ${hrs} hr(s)</div>
+                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p>
+                </div>`;
             window.print();
         }
 
@@ -260,7 +265,7 @@
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- ARCHIVE ENGINE ---
+    // --- ARCHIVE LOGIC ---
     window.moveToArchive = async (sourceCol, id) => {
         if(!confirm("Move to Recycle Bin?")) return;
         const docSnap = await getDoc(doc(db, sourceCol, id));
@@ -307,7 +312,7 @@
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
 
-    // --- RENDERING & SNAPSHOTS ---
+    // --- RENDERING ---
     let historySnap = [];
     let salesSnap = [];
 
