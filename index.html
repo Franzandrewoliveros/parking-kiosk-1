@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Metro Plaza Bagong Silang - Management System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root { 
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
@@ -62,7 +63,13 @@
         .admin-only, .guard-only { display: none; }
         .view-only-tag { color: #888; font-size: 0.7rem; font-style: italic; }
 
-        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
+        #qrcode img { margin: 0 auto; } /* Center QR image */
+
+        @media print { 
+            body * { visibility: hidden; } 
+            #print-area, #print-area * { visibility: visible; } 
+            #print-area { position: absolute; top: 0; width: 100%; display: flex; justify-content: center; } 
+        }
     </style>
 </head>
 <body>
@@ -99,7 +106,7 @@
 
 <div id="sidebar">
     <div class="sidebar-brand">
-        <h2 style="margin:0;">METRO PLAZA BAGONG SILANG</h2>
+        <h2 style="margin:0;">METRO PLAZA</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
     <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">📡 CONNECT PRINTER</div>
@@ -141,7 +148,6 @@
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <input type="text" class="search-box" placeholder="Search Ref #..." onkeyup="filterTable('table-sale', this.value)" style="border: 2px solid var(--red-main);">
             <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
             <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
@@ -257,39 +263,57 @@
         
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
+        // QR DATA
+        const qrContent = `REF:${refNo}|PLATE:${plate}|TOTAL:P${payment}`;
+
+        // Prepare Print Area with QR
+        document.getElementById('print-area').innerHTML = `
+            <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:15px; background:white; color:black;">
+                <h3 style="margin:0;">METRO PLAZA</h3>
+                <p style="margin:5px 0;">Bagong Silang Branch</p>
+                <hr>
+                <div style="text-align:left; font-size:12px;">
+                    <b>REF NO: ${refNo}</b><br>
+                    PLATE: ${plate}<br>
+                    DATE: ${new Date().toLocaleDateString()}<br>
+                    TIME IN: ${data.entryTime}<br>
+                    TIME OUT: ${outTime}<br>
+                    DURATION: ${hrs} hr(s)
+                </div>
+                <hr>
+                <h2 style="margin:10px 0;">TOTAL: P${payment}.00</h2>
+                <div id="qrcode" style="display:flex; justify-content:center; margin:10px 0;"></div>
+                <hr>
+                <p style="font-size:10px;">Thank you for parking with us!</p>
+            </div>`;
+
+        // Generate QR Code
+        new QRCode(document.getElementById("qrcode"), {
+            text: qrContent,
+            width: 120,
+            height: 120
+        });
+
+        // Bluetooth Print string (Text only)
         const receiptStr = `
 METRO PLAZA
 Bagong Silang Branch
 -------------------------
 REF NO:    ${refNo}
 PLATE:     ${plate}
-DATE:      ${new Date().toLocaleDateString()}
-TIME IN:   ${data.entryTime}
-TIME OUT:  ${outTime}
+IN:        ${data.entryTime}
+OUT:       ${outTime}
 DURATION:  ${hrs} hr(s)
+TOTAL:     P${payment}.00
 -------------------------
-TOTAL FEE: P${payment}.00
--------------------------
-Thank you!
+Scan receipt for verify
 `;
         
         const printed = await printReceipt(receiptStr);
         
         if (!printed) {
-            document.getElementById('print-area').innerHTML = `
-                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
-                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
-                    <div style="text-align:left;">
-                        <b>REF NO: ${refNo}</b><br>
-                        PLATE: ${plate}<br>
-                        DATE: ${new Date().toLocaleDateString()}<br>
-                        TIME IN: ${data.entryTime}<br>
-                        TIME OUT: ${outTime}<br>
-                        DURATION: ${hrs} hr(s)
-                    </div>
-                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p>
-                </div>`;
-            window.print();
+            // Wait for QR to render then print
+            setTimeout(() => { window.print(); }, 500);
         }
 
         await deleteDoc(doc(db, "active_parking", plate));
