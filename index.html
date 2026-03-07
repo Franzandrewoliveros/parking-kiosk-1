@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Metro Plaza Bagong Silang - Management System</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root { 
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
@@ -63,20 +62,14 @@
         .admin-only, .guard-only { display: none; }
         .view-only-tag { color: #888; font-size: 0.7rem; font-style: italic; }
 
-        #qrcode img { margin: 0 auto; } 
-
-        @media print { 
-            body * { visibility: hidden; } 
-            #print-area, #print-area * { visibility: visible; } 
-            #print-area { position: absolute; top: 0; width: 100%; display: flex; justify-content: center; } 
-        }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; top: 0; width: 100%; text-align: center; } }
     </style>
 </head>
 <body>
 
 <div id="login-overlay" class="parking-bg">
     <div class="glass-card" id="role-selection">
-        <h1 style="color:var(--red-main); margin:0;">METRO PLAZA</h1>
+        <h1 style="color:var(--red-main); margin:0;">METRO PLAZA BAGONG SILANG</h1>
         <p style="margin-bottom:30px; color:#555; font-weight: bold;">SELECT ACCESS LEVEL</p>
         <button onclick="enterGuard()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem; margin-bottom:15px;">🛡️ GUARD ACCESS</button>
         <button onclick="showAdminLogin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">🔑 ADMIN LOGIN</button>
@@ -106,7 +99,7 @@
 
 <div id="sidebar">
     <div class="sidebar-brand">
-        <h2 style="margin:0;">METRO PLAZA</h2>
+        <h2 style="margin:0;">METRO PLAZA BAGONG SILANG</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
     <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">📡 CONNECT PRINTER</div>
@@ -148,6 +141,7 @@
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
+            <input type="text" class="search-box" placeholder="Search Ref #..." onkeyup="filterTable('table-sale', this.value)" style="border: 2px solid var(--red-main);">
             <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
             <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
@@ -196,7 +190,7 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // --- BLUETOOTH WITH ESC/POS QR ---
+    // --- BLUETOOTH ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
@@ -209,35 +203,14 @@
         } catch (e) { alert("Bluetooth Error: " + e.message); }
     };
 
-    const printReceipt = async (data) => {
+    const printReceipt = async (text) => {
         if (!printerCharacteristic) return false;
         try {
             const encoder = new TextEncoder();
-            let commands = [0x1B, 0x40]; // Init printer
-
-            // Header Text
-            commands.push(...encoder.encode(data.header));
-
-            // QR Code Commands
-            const qrData = encoder.encode(data.qr);
-            const nL = (qrData.length + 3) % 256;
-            const nH = Math.floor((qrData.length + 3) / 256);
-
-            commands.push(
-                0x1D, 0x28, 0x6B, 0x04, 0x00, 0x30, 0x41, 0x32, 0x00,    // Model 2
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x30, 0x43, 0x08,          // Size (8)
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x30, 0x45, 0x30,          // EC Level L
-                0x1D, 0x28, 0x6B, nL, nH, 0x30, 0x50, 0x30, ...qrData,   // Store Data
-                0x1D, 0x28, 0x6B, 0x03, 0x00, 0x30, 0x51, 0x30           // PRINT QR
-            );
-
-            // Footer & Cut
-            commands.push(...encoder.encode("\n" + data.footer + "\n\n\n\n"));
-            commands.push(0x1D, 0x56, 0x41); // Partial cut
-
-            await printerCharacteristic.writeValue(new Uint8Array(commands));
+            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
+            await printerCharacteristic.writeValue(data);
             return true;
-        } catch (e) { console.error(e); return false; }
+        } catch (e) { return false; }
     };
 
     // --- AUTH ---
@@ -253,6 +226,8 @@
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
+        renderHistory();
+        renderSales();
     }
 
     // --- CORE LOGIC ---
@@ -271,43 +246,56 @@
         const hrs = Math.max(1, hrsElapsed); 
         let payment = (hrs > 4) ? 20 + (hrs - 4) * 5 : 20;
 
-        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
+        // Save to History & Sales
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
+        const salesRef = await addDoc(collection(db, "sales_report"), { 
+            plate, 
+            pay: payment, 
+            date: data.date,
+            timestamp: Date.now() 
+        });
         
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
-        const qrContent = `REF:${refNo}|PLATE:${plate}|TOTAL:P${payment}`;
 
-        // Screen Display
-        document.getElementById('print-area').innerHTML = `
-            <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:15px; background:white; color:black;">
-                <h3 style="margin:0;">METRO PLAZA</h3>
-                <hr>
-                <div style="text-align:left; font-size:12px;">
-                    <b>REF NO: ${refNo}</b><br>
-                    PLATE: ${plate}<br>
-                    DURATION: ${hrs} hr(s)
-                </div>
-                <hr>
-                <h2 style="margin:10px 0;">TOTAL: P${payment}.00</h2>
-                <div id="qrcode" style="display:flex; justify-content:center; margin:10px 0;"></div>
-            </div>`;
-
-        new QRCode(document.getElementById("qrcode"), { text: qrContent, width: 120, height: 120 });
-
-        // BT Printer Output
-        const printData = {
-            header: `METRO PLAZA\n----------------\nREF: ${refNo}\nPLATE: ${plate}\nDURATION: ${hrs}hr(s)\n`,
-            qr: qrContent,
-            footer: `TOTAL: P${payment}.00\n----------------\nThank you!`
-        };
+        const receiptStr = `
+METRO PLAZA
+Bagong Silang Branch
+-------------------------
+REF NO:    ${refNo}
+PLATE:     ${plate}
+DATE:      ${new Date().toLocaleDateString()}
+TIME IN:   ${data.entryTime}
+TIME OUT:  ${outTime}
+DURATION:  ${hrs} hr(s)
+-------------------------
+TOTAL FEE: P${payment}.00
+-------------------------
+Thank you!
+`;
         
-        const printed = await printReceipt(printData);
-        if (!printed) setTimeout(() => { window.print(); }, 500);
+        const printed = await printReceipt(receiptStr);
+        
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
+                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
+                    <div style="text-align:left;">
+                        <b>REF NO: ${refNo}</b><br>
+                        PLATE: ${plate}<br>
+                        DATE: ${new Date().toLocaleDateString()}<br>
+                        TIME IN: ${data.entryTime}<br>
+                        TIME OUT: ${outTime}<br>
+                        DURATION: ${hrs} hr(s)
+                    </div>
+                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p>
+                </div>`;
+            window.print();
+        }
 
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // (Remaining functions: moveToArchive, kioskCheckIn, filters, etc. remain the same)
+    // --- ARCHIVE ENGINE ---
     window.moveToArchive = async (sourceCol, id) => {
         if(!confirm("Move to Recycle Bin?")) return;
         const docSnap = await getDoc(doc(db, sourceCol, id));
@@ -342,6 +330,7 @@
     window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
     window.clearCollection = async (col) => { if(confirm("EMPTY BIN?")) { const s = await getDocs(collection(db, col)); const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit(); }};
 
+    // --- KIOSK ---
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
@@ -353,13 +342,16 @@
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
 
+    // --- RENDERING ---
     let historySnap = [];
     let salesSnap = [];
 
     const renderHistory = () => {
         document.getElementById('table-hist').innerHTML = historySnap.map(d => {
             const r = d.data();
-            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">View Only</span></td>`;
+            const action = (currentUserRole === 'admin') 
+                ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` 
+                : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
     };
@@ -370,7 +362,9 @@
             const r = d.data(); 
             const refNo = d.id.substring(0, 8).toUpperCase();
             g += Number(r.pay); if(r.date === todayStr) t += Number(r.pay);
-            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">View Only</span></td>`;
+            const action = (currentUserRole === 'admin') 
+                ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` 
+                : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td style="font-family:monospace; color:#666;">#${refNo}</td><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
         document.getElementById('grand-total').innerText = "P" + g.toFixed(2);
@@ -394,6 +388,7 @@
         }).reverse().join('');
     });
 
+    // --- UTILS ---
     window.filterTable = (id, q) => document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none");
     window.filterByDate = (id, val) => {
         if(!val) return document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = "");
