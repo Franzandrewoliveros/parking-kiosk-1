@@ -85,7 +85,7 @@
 
 <div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
     <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
-        <span>METRO PLAZA KIOSK</span>
+        <span>METRO PLAZA BAGONG SILANG KIOSK</span>
         <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; padding: 8px 15px; border-radius:5px;">← BACK</button>
     </div>
     <div style="text-align:center; color:white;">
@@ -119,7 +119,17 @@
 
     <div id="dash" class="tab-view table-container">
         <table>
-            <thead><tr><th>PLATE</th><th>TIME IN</th><th>DURATION</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>PLATE</th>
+                    <th>TIME IN</th>
+                    <th>DURATION</th>
+                    <th>CURRENT FEE</th>
+                    <th>STATUS</th>
+                    <th>DATE</th>
+                    <th>ACTION</th>
+                </tr>
+            </thead>
             <tbody id="table-dash"></tbody>
         </table>
     </div>
@@ -141,7 +151,6 @@
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <input type="text" class="search-box" placeholder="Search Ref #..." onkeyup="filterTable('table-sale', this.value)" style="border: 2px solid var(--red-main);">
             <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
             <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
@@ -237,22 +246,25 @@
         return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe") };
     }
 
+    // UPDATED PRICING LOGIC
+    function calculatePayment(msIn) {
+        const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
+        const totalHrs = Math.max(1, hrsElapsed);
+        // 20 for first 4 hours, then 10 per hour
+        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
+    }
+
     window.checkOut = async (plate) => {
         const data = activeParkingCache.find(d => d.plate === plate);
         if(!data) return;
         
         const outTime = new Date().toLocaleTimeString();
-        const hrsElapsed = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-        const hrs = Math.max(1, hrsElapsed); 
-        let payment = (hrs > 4) ? 20 + (hrs - 4) * 5 : 20;
+        const payment = calculatePayment(data.rawIn);
+        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
 
-        // Save to History & Sales
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
         const salesRef = await addDoc(collection(db, "sales_report"), { 
-            plate, 
-            pay: payment, 
-            date: data.date,
-            timestamp: Date.now() 
+            plate, pay: payment, date: data.date, timestamp: Date.now() 
         });
         
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
@@ -274,7 +286,6 @@ Thank you!
 `;
         
         const printed = await printReceipt(receiptStr);
-        
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
@@ -291,7 +302,6 @@ Thank you!
                 </div>`;
             window.print();
         }
-
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
@@ -375,7 +385,17 @@ Thank you!
         activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
         document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
             const dur = formatDuration(Date.now() - r.rawIn);
-            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td><span style="color:green">● PARKED</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+            const currentFee = calculatePayment(r.rawIn); // Live fee calculation
+            return `
+                <tr>
+                    <td><b>${r.plate}</b></td>
+                    <td>${r.entryTime}</td>
+                    <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
+                    <td style="font-weight:bold; color:var(--red-main)">P${currentFee}.00</td>
+                    <td><span style="color:green">● PARKED</span></td>
+                    <td>${r.date}</td>
+                    <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
+                </tr>`;
         }).join('');
     });
 
