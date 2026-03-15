@@ -62,7 +62,6 @@
         .admin-only, .guard-only { display: none; }
         .view-only-tag { color: #888; font-size: 0.7rem; font-style: italic; }
 
-        /* RECEIPT PRINTING OPTIMIZATION */
         @media print { 
             body * { visibility: hidden; } 
             #print-area, #print-area * { visibility: visible; } 
@@ -125,21 +124,30 @@
         <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
     </div>
 
-    <div id="dash" class="tab-view table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>PLATE</th>
-                    <th>TIME IN</th>
-                    <th>DURATION</th>
-                    <th>CURRENT FEE</th>
-                    <th>STATUS</th>
-                    <th>DATE</th>
-                    <th>ACTION</th>
-                </tr>
-            </thead>
-            <tbody id="table-dash"></tbody>
-        </table>
+    <div id="dash" class="tab-view">
+        <h3 style="color: var(--green-guard); margin-bottom: 10px;">🟢 ACTIVE PARKING (NORMAL)</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>PLATE</th><th>TIME IN</th><th>DURATION</th><th>FEE</th><th>STATUS</th><th>DATE</th><th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="table-dash-normal"></tbody>
+            </table>
+        </div>
+
+        <h3 style="color: var(--red-main); margin-top: 30px; margin-bottom: 10px;">⚠️ OVERTIME PARKING (4H+)</h3>
+        <div class="table-container" style="border-top: 5px solid var(--red-main);">
+            <table>
+                <thead>
+                    <tr>
+                        <th>PLATE</th><th>TIME IN</th><th>DURATION</th><th>FEE</th><th>STATUS</th><th>DATE</th><th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="table-dash-overtime"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="hist" class="tab-view" style="display:none">
@@ -293,7 +301,6 @@ Thank you!
         
         const printed = await printReceipt(receiptStr);
         if (!printed) {
-            // Updated Print Layout with Black and White Logo Filter
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" 
@@ -319,6 +326,41 @@ Thank you!
         }
         await deleteDoc(doc(db, "active_parking", plate));
     };
+
+    // --- DASHBOARD REAL-TIME SYNC ---
+    onSnapshot(collection(db, "active_parking"), snap => {
+        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+        
+        let normalHTML = "";
+        let overtimeHTML = "";
+        const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+        activeParkingCache.forEach(r => {
+            const timeElapsed = Date.now() - r.rawIn;
+            const dur = formatDuration(timeElapsed);
+            const currentFee = calculatePayment(r.rawIn);
+            
+            const row = `
+                <tr>
+                    <td><b>${r.plate}</b></td>
+                    <td>${r.entryTime}</td>
+                    <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
+                    <td style="font-weight:bold; color:var(--red-main)">P${currentFee}.00</td>
+                    <td><span style="color:${timeElapsed >= FOUR_HOURS_MS ? 'red' : 'green'}">● ${timeElapsed >= FOUR_HOURS_MS ? 'OVERTIME' : 'PARKED'}</span></td>
+                    <td>${r.date}</td>
+                    <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
+                </tr>`;
+
+            if (timeElapsed >= FOUR_HOURS_MS) {
+                overtimeHTML += row;
+            } else {
+                normalHTML += row;
+            }
+        });
+
+        document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No active regular parking</td></tr>';
+        document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No overtime vehicles</td></tr>';
+    });
 
     // --- ARCHIVE ENGINE ---
     window.moveToArchive = async (sourceCol, id) => {
@@ -396,24 +438,6 @@ Thank you!
         document.getElementById('today-total').innerText = "P" + t.toFixed(2);
     };
 
-    onSnapshot(collection(db, "active_parking"), snap => {
-        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        document.getElementById('table-dash').innerHTML = activeParkingCache.map(r => {
-            const dur = formatDuration(Date.now() - r.rawIn);
-            const currentFee = calculatePayment(r.rawIn);
-            return `
-                <tr>
-                    <td><b>${r.plate}</b></td>
-                    <td>${r.entryTime}</td>
-                    <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
-                    <td style="font-weight:bold; color:var(--red-main)">P${currentFee}.00</td>
-                    <td><span style="color:green">● PARKED</span></td>
-                    <td>${r.date}</td>
-                    <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
-                </tr>`;
-        }).join('');
-    });
-
     onSnapshot(collection(db, "parking_history"), snap => { historySnap = snap.docs; renderHistory(); });
     onSnapshot(collection(db, "sales_report"), snap => { salesSnap = snap.docs; renderSales(); });
     onSnapshot(collection(db, "archive"), snap => {
@@ -436,7 +460,7 @@ Thank you!
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
-        document.getElementById('view-title').innerText = el.innerText.trim();
+        document.getElementById('view-title').innerText = el.innerText.trim().split(' ')[0] === "DASHBOARD" ? "PARKING OVERVIEW" : el.innerText.trim();
     };
 
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
