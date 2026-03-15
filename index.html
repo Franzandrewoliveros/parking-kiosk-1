@@ -40,6 +40,12 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         
+        /* DURATION COLOR BADGES */
+        .duration-badge { padding: 5px 12px; border-radius: 50px; color: white; font-weight: bold; font-size: 0.8rem; }
+        .dur-safe { background: var(--green-guard); }
+        .dur-warning { background: var(--warning-orange); }
+        .dur-danger { background: var(--red-main); }
+
         .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
         .btn-delete { background: #444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
         .btn-restore { background: var(--green-guard); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-right: 5px;}
@@ -54,7 +60,6 @@
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
 
-        /* 58mm THERMAL PRINTER OPTIMIZATION */
         @media print { 
             body * { visibility: hidden; } 
             #print-area, #print-area * { visibility: visible; } 
@@ -239,13 +244,12 @@
         } catch (e) { return false; }
     };
 
-    // --- KIOSK ENTRY PRINTING (58mm OPTIMIZED WITH ADDRESS) ---
     const printEntryTicket = async (plate, entryTime, date) => {
         const receiptStr = 
 `      METRO PLAZA
      BAGONG SILANG
  Phs2, Langit Rd, Caloocan
-       Metro Manila
+        Metro Manila
 --------------------------------
           ENTRY TICKET
 --------------------------------
@@ -296,7 +300,15 @@ TIME IN:  ${entryTime}
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe") };
+        
+        let cssClass = "dur-safe"; // Default Green (under 2 hours)
+        if (hrs >= 4) {
+            cssClass = "dur-danger"; // Red (4 hours or more)
+        } else if (hrs >= 2) {
+            cssClass = "dur-warning"; // Orange (2 hours to 3h 59m)
+        }
+
+        return { text: `${hrs}h ${mins}m`, css: cssClass };
     }
 
     function calculatePayment(msIn) {
