@@ -256,7 +256,6 @@
 PLATE:    ${plate}
 DATE:     ${date}
 TIME IN:  ${entryTime}
-    PLEASE KEEP THIS TICKET
 `;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
@@ -273,7 +272,6 @@ TIME IN:  ${entryTime}
                         TIME:  ${entryTime}<br>
                     </div>
                     ----------------------------<br>
-                    PLEASE KEEP THIS TICKET
                 </div>`;
             window.print();
         }
