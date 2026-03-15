@@ -66,7 +66,6 @@
             body * { visibility: hidden; } 
             #print-area, #print-area * { visibility: visible; } 
             #print-area { position: absolute; top: 0; left: 0; width: 300px; text-align: center; } 
-            .receipt-logo { filter: grayscale(1) contrast(500%); width: 80px !important; height: auto; }
         }
     </style>
 </head>
@@ -238,10 +237,10 @@
         } catch (e) { return false; }
     };
 
-    // --- KIOSK ENTRY PRINTING HELPER ---
+    // --- KIOSK ENTRY PRINTING (FULL NAME UPDATED) ---
     const printEntryTicket = async (plate, entryTime, date) => {
         const receiptStr = `
-METRO PLAZA
+METRO PLAZA BAGONG SILANG
 Phs2, Langit Rd, Caloocan City
 -------------------------
       ENTRY TICKET
@@ -257,10 +256,7 @@ Thank you!
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" 
-                         class="receipt-logo"
-                         style="width: 70px; border-radius: 50%; filter: grayscale(1) contrast(500%) brightness(0.8); margin-bottom: 5px;">
-                    <h3 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h3>
+                    <h3 style="margin:0; font-size: 1rem;">METRO PLAZA BAGONG SILANG</h3>
                     <p style="margin:0; font-size: 0.75rem;">Phs2, Langit Rd, Caloocan, Metro Manila</p>
                     <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
                     <div style="text-align:left; font-size: 0.9rem;">
@@ -269,7 +265,7 @@ Thank you!
                         TIME IN: ${entryTime}<br>
                     </div>
                     <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <p style="font-size: 0.75rem;">WELCOME TO METRO PLAZA</p>
+                    <p style="font-size: 0.75rem;">WELCOME TO METRO PLAZA BAGONG SILANG</p>
                 </div>`;
             window.print();
         }
@@ -321,7 +317,7 @@ Thank you!
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
         const receiptStr = `
-METRO PLAZA
+METRO PLAZA BAGONG SILANG
 Phs2, Langit Rd, Caloocan City
 -------------------------
 REF NO:    ${refNo}
@@ -340,10 +336,7 @@ Thank you!
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" 
-                         class="receipt-logo"
-                         style="width: 70px; border-radius: 50%; filter: grayscale(1) contrast(500%) brightness(0.8); margin-bottom: 5px;">
-                    <h3 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h3>
+                    <h3 style="margin:0; font-size: 1rem;">METRO PLAZA BAGONG SILANG</h3>
                     <p style="margin:0; font-size: 0.75rem;">Phs2, Langit Rd, Caloocan, Metro Manila</p>
                     <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
                     <div style="text-align:left; font-size: 0.9rem;">
