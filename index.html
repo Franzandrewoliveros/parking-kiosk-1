@@ -250,7 +250,6 @@ DATE:       ${date}
 TIME IN:    ${entryTime}
 -------------------------
 Please keep this ticket.
-Thank you!
 `;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
@@ -326,7 +325,6 @@ DATE:      ${new Date().toLocaleDateString()}
 TIME IN:   ${data.entryTime}
 TIME OUT:  ${outTime}
 DURATION:  ${hrs} hr(s)
--------------------------
 TOTAL FEE: P${payment}.00
 -------------------------
 Thank you!
