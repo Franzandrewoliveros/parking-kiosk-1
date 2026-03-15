@@ -40,6 +40,7 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         
+        /* DURATION COLOR BADGES */
         .duration-badge { padding: 5px 12px; border-radius: 50px; color: white; font-weight: bold; font-size: 0.8rem; }
         .dur-safe { background: var(--green-guard); }
         .dur-warning { background: var(--warning-orange); }
@@ -244,16 +245,15 @@
     };
 
     const printEntryTicket = async (plate, entryTime, date) => {
-        // \x1B\x61\x01 = Center, \x1B\x45\x01 = Bold
         const receiptStr = 
-`\x1B\x61\x01\x1B\x45\x01[ M P ]\x1B\x45\x00
-      METRO PLAZA
+`      METRO PLAZA
      BAGONG SILANG
  Phs2, Langit Rd, Caloocan
+        Metro Manila
 --------------------------------
           ENTRY TICKET
 --------------------------------
-\x1B\x61\x00PLATE:    ${plate}
+PLATE:    ${plate}
 DATE:     ${date}
 TIME IN:  ${entryTime}
 `;
@@ -261,10 +261,10 @@ TIME IN:  ${entryTime}
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="text-align:center; font-size: 11px; line-height: 1.2;">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 30px; margin-bottom: 5px; filter: grayscale(100%);">
-                    <br><strong style="font-size: 13px;">METRO PLAZA</strong><br>
+                    <strong style="font-size: 13px;">METRO PLAZA</strong><br>
                     <strong>BAGONG SILANG</strong><br>
                     Phs2, Langit Rd, Caloocan<br>
+                    Metro Manila<br>
                     ----------------------------<br>
                     <div style="text-align:left; margin-left: 5px;">
                         <strong>PLATE: ${plate}</strong><br>
@@ -296,7 +296,14 @@ TIME IN:  ${entryTime}
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        let cssClass = (hrs >= 4) ? "dur-danger" : (hrs >= 2) ? "dur-warning" : "dur-safe";
+        
+        let cssClass = "dur-safe"; // Default Green (under 2 hours)
+        if (hrs >= 4) {
+            cssClass = "dur-danger"; // Red (4 hours or more)
+        } else if (hrs >= 2) {
+            cssClass = "dur-warning"; // Orange (2 hours to 3h 59m)
+        }
+
         return { text: `${hrs}h ${mins}m`, css: cssClass };
     }
 
@@ -319,15 +326,15 @@ TIME IN:  ${entryTime}
             plate, pay: payment, date: data.date, timestamp: Date.now() 
         });
         
-        const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
+  const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
-        const receiptStr = `\x1B\x61\x01\x1B\x45\x01[ M P ]\x1B\x45\x00
+        const receiptStr = `
 METRO PLAZA
 Bagong Silang Branch
 -------------------------
 REF NO:    ${refNo}
 PLATE:     ${plate}
-\x1B\x61\x00DATE:      ${new Date().toLocaleDateString()}
+DATE:      ${new Date().toLocaleDateString()}
 TIME IN:   ${data.entryTime}
 TIME OUT:  ${outTime}
 DURATION:  ${hrs} hr(s)
@@ -341,7 +348,6 @@ TOTAL FEE: P${payment}.00
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 30px; filter: grayscale(100%);">
                     <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
                     <div style="text-align:left;">
                         <b>REF NO: ${refNo}</b><br>
@@ -425,7 +431,7 @@ TOTAL FEE: P${payment}.00
     const renderHistory = () => {
         document.getElementById('table-hist').innerHTML = historySnap.map(d => {
             const r = d.data();
-            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">Admin Only</span></td>`;
+            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
     };
@@ -435,7 +441,7 @@ TOTAL FEE: P${payment}.00
         document.getElementById('table-sale').innerHTML = salesSnap.map(d => {
             const r = d.data(); const refNo = d.id.substring(0, 8).toUpperCase();
             g += Number(r.pay); if(r.date === todayStr) t += Number(r.pay);
-            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">Admin Only</span></td>`;
+            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td style="font-family:monospace; color:#666;">#${refNo}</td><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
         document.getElementById('grand-total').innerText = "P" + g.toFixed(2);
