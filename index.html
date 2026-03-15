@@ -98,7 +98,7 @@
         <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
         <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
         <br>
-        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; font-weight: bold;">CHECK-IN</button>
+        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; font-weight: bold;">CHECK-IN & PRINT</button>
         <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold;"></div>
     </div>
 </div>
@@ -238,6 +238,43 @@
         } catch (e) { return false; }
     };
 
+    // --- KIOSK ENTRY PRINTING HELPER ---
+    const printEntryTicket = async (plate, entryTime, date) => {
+        const receiptStr = `
+METRO PLAZA
+Phs2, Langit Rd, Caloocan City
+-------------------------
+      ENTRY TICKET
+-------------------------
+PLATE:      ${plate}
+DATE:       ${date}
+TIME IN:    ${entryTime}
+-------------------------
+Please keep this ticket.
+Thank you!
+`;
+        const printed = await printReceipt(receiptStr);
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
+                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" 
+                         class="receipt-logo"
+                         style="width: 70px; border-radius: 50%; filter: grayscale(1) contrast(500%) brightness(0.8); margin-bottom: 5px;">
+                    <h3 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h3>
+                    <p style="margin:0; font-size: 0.75rem;">Phs2, Langit Rd, Caloocan, Metro Manila</p>
+                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
+                    <div style="text-align:left; font-size: 0.9rem;">
+                        <b>PLATE: ${plate}</b><br>
+                        DATE: ${date}<br>
+                        TIME IN: ${entryTime}<br>
+                    </div>
+                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
+                    <p style="font-size: 0.75rem;">WELCOME TO METRO PLAZA</p>
+                </div>`;
+            window.print();
+        }
+    };
+
     // --- AUTH ---
     window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
@@ -283,7 +320,6 @@
         
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
-        // UPDATED: ADDRESS IN BLUETOOTH STRING
         const receiptStr = `
 METRO PLAZA
 Phs2, Langit Rd, Caloocan City
@@ -302,7 +338,6 @@ Thank you!
         
         const printed = await printReceipt(receiptStr);
         if (!printed) {
-            // UPDATED: ADDRESS IN HTML PRINT AREA
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" 
@@ -399,15 +434,29 @@ Thank you!
     window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
     window.clearCollection = async (col) => { if(confirm("EMPTY BIN?")) { const s = await getDocs(collection(db, col)); const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit(); }};
 
-    // --- KIOSK ---
+    // --- KIOSK CHECK-IN & PRINT ---
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
-        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() });
-        document.getElementById('kiosk-feedback').innerText = "✅ SUCCESS!";
+
+        const entryTime = new Date().toLocaleTimeString();
+        const date = new Date().toLocaleDateString();
+        const rawIn = Date.now();
+
+        await setDoc(doc(db, "active_parking", plate), { 
+            plate, 
+            entryTime, 
+            rawIn, 
+            date 
+        });
+
+        await printEntryTicket(plate, entryTime, date);
+
+        document.getElementById('kiosk-feedback').innerText = "✅ PRINTING TICKET...";
         document.getElementById('kioskPlate').value = "";
-        setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 2000);
+        setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 3000);
     };
+
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
 
@@ -449,7 +498,6 @@ Thank you!
         }).reverse().join('');
     });
 
-    // --- UTILS ---
     window.filterTable = (id, q) => document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none");
     window.filterByDate = (id, val) => {
         if(!val) return document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = "");
