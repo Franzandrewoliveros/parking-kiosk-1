@@ -54,18 +54,21 @@
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
 
-        .duration-badge { font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; display: inline-block; }
-        .dur-safe { background: var(--green-guard); color: white; }
-        .dur-warning { background: var(--warning-orange); color: white; }
-        .dur-danger { background: var(--red-main); color: white; }
-
-        .admin-only, .guard-only { display: none; }
-        .view-only-tag { color: #888; font-size: 0.7rem; font-style: italic; }
-
+        /* 58mm THERMAL PRINTER OPTIMIZATION */
         @media print { 
             body * { visibility: hidden; } 
             #print-area, #print-area * { visibility: visible; } 
-            #print-area { position: absolute; top: 0; left: 0; width: 300px; text-align: center; } 
+            #print-area { 
+                position: absolute; 
+                top: 0; 
+                left: 0; 
+                width: 48mm; 
+                padding: 2mm;
+                font-family: 'Courier New', Courier, monospace;
+                color: black;
+                background: white;
+            } 
+            @page { size: 58mm auto; margin: 0; }
         }
     </style>
 </head>
@@ -214,7 +217,6 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // --- BLUETOOTH ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
@@ -237,40 +239,44 @@
         } catch (e) { return false; }
     };
 
-    // --- KIOSK ENTRY PRINTING (FULL NAME UPDATED) ---
+    // --- KIOSK ENTRY PRINTING (58mm OPTIMIZED WITH ADDRESS) ---
     const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = `
-METRO PLAZA BAGONG SILANG
-Phs2, Langit Rd, Caloocan City
--------------------------
-      ENTRY TICKET
--------------------------
-PLATE:      ${plate}
-DATE:       ${date}
-TIME IN:    ${entryTime}
--------------------------
-Please keep this ticket.
+        const receiptStr = 
+`      METRO PLAZA
+     BAGONG SILANG
+ Phs2, Langit Rd, Caloocan
+       Metro Manila
+--------------------------------
+          ENTRY TICKET
+--------------------------------
+PLATE:    ${plate}
+DATE:     ${date}
+TIME IN:  ${entryTime}
+--------------------------------
+    PLEASE KEEP THIS TICKET
+    THANK YOU & WELCOME!
 `;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
-                <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
-                    <h3 style="margin:0; font-size: 1rem;">METRO PLAZA BAGONG SILANG</h3>
-                    <p style="margin:0; font-size: 0.75rem;">Phs2, Langit Rd, Caloocan, Metro Manila</p>
-                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <div style="text-align:left; font-size: 0.9rem;">
-                        <b>PLATE: ${plate}</b><br>
-                        DATE: ${date}<br>
-                        TIME IN: ${entryTime}<br>
+                <div style="text-align:center; font-size: 11px; line-height: 1.2;">
+                    <strong style="font-size: 13px;">METRO PLAZA</strong><br>
+                    <strong>BAGONG SILANG</strong><br>
+                    Phs2, Langit Rd, Caloocan<br>
+                    Metro Manila<br>
+                    ----------------------------<br>
+                    <div style="text-align:left; margin-left: 5px;">
+                        <strong>PLATE: ${plate}</strong><br>
+                        DATE:  ${date}<br>
+                        TIME:  ${entryTime}<br>
                     </div>
-                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <p style="font-size: 0.75rem;">WELCOME TO METRO PLAZA BAGONG SILANG</p>
+                    ----------------------------<br>
+                    PLEASE KEEP THIS TICKET
                 </div>`;
             window.print();
         }
     };
 
-    // --- AUTH ---
     window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE"); };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.loginAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = "admin"; loginSuccess("🔑 ADMIN MODE"); } else { alert("Access Denied"); } };
@@ -287,7 +293,6 @@ Please keep this ticket.
         renderSales();
     }
 
-    // --- CORE LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
@@ -315,82 +320,63 @@ Please keep this ticket.
         
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
-        const receiptStr = `
-METRO PLAZA BAGONG SILANG
-Phs2, Langit Rd, Caloocan City
--------------------------
-REF NO:    ${refNo}
-PLATE:     ${plate}
-DATE:      ${new Date().toLocaleDateString()}
-TIME IN:   ${data.entryTime}
-TIME OUT:  ${outTime}
-DURATION:  ${hrs} hr(s)
-TOTAL FEE: P${payment}.00
--------------------------
-Thank you!
+        const receiptStr = 
+`      METRO PLAZA
+     BAGONG SILANG
+ Phs2, Langit Rd, Caloocan
+--------------------------------
+REF NO:   ${refNo}
+PLATE:    ${plate}
+DATE:     ${new Date().toLocaleDateString()}
+TIME IN:  ${data.entryTime}
+TIME OUT: ${outTime}
+DURATION: ${hrs} hr(s)
+--------------------------------
+TOTAL FEE:    P${payment}.00
+--------------------------------
+   THANK YOU & DRIVE SAFE!
 `;
         
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
-                <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
-                    <h3 style="margin:0; font-size: 1rem;">METRO PLAZA BAGONG SILANG</h3>
-                    <p style="margin:0; font-size: 0.75rem;">Phs2, Langit Rd, Caloocan, Metro Manila</p>
-                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <div style="text-align:left; font-size: 0.9rem;">
-                        <b>REF NO: ${refNo}</b><br>
+                <div style="text-align:center; font-size: 11px; line-height: 1.2;">
+                    <strong style="font-size: 13px;">METRO PLAZA</strong><br>
+                    <strong>BAGONG SILANG</strong><br>
+                    Phs2, Langit Rd, Caloocan<br>
+                    ----------------------------<br>
+                    <div style="text-align:left; margin-left: 5px;">
+                        REF:   ${refNo}<br>
                         PLATE: ${plate}<br>
-                        DATE: ${new Date().toLocaleDateString()}<br>
-                        TIME IN: ${data.entryTime}<br>
-                        TIME OUT: ${outTime}<br>
-                        DURATION: ${hrs} hr(s)
+                        IN:    ${data.entryTime}<br>
+                        OUT:   ${outTime}<br>
+                        DUR:   ${hrs} hr(s)
                     </div>
-                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <h2 style="margin: 5px 0;">TOTAL: P${payment}.00</h2>
-                    <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <p style="font-size: 0.75rem;">THANK YOU AND DRIVE SAFELY!</p>
+                    ----------------------------<br>
+                    <strong style="font-size: 14px;">TOTAL: P${payment}.00</strong><br>
+                    ----------------------------<br>
+                    THANK YOU & DRIVE SAFE!
                 </div>`;
             window.print();
         }
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- DASHBOARD REAL-TIME SYNC ---
     onSnapshot(collection(db, "active_parking"), snap => {
         activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        
-        let normalHTML = "";
-        let overtimeHTML = "";
+        let normalHTML = "", overtimeHTML = "";
         const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
-
         activeParkingCache.forEach(r => {
             const timeElapsed = Date.now() - r.rawIn;
             const dur = formatDuration(timeElapsed);
             const currentFee = calculatePayment(r.rawIn);
-            
-            const row = `
-                <tr>
-                    <td><b>${r.plate}</b></td>
-                    <td>${r.entryTime}</td>
-                    <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
-                    <td style="font-weight:bold; color:var(--red-main)">P${currentFee}.00</td>
-                    <td><span style="color:${timeElapsed >= FOUR_HOURS_MS ? 'red' : 'green'}">● ${timeElapsed >= FOUR_HOURS_MS ? 'OVERTIME' : 'PARKED'}</span></td>
-                    <td>${r.date}</td>
-                    <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
-                </tr>`;
-
-            if (timeElapsed >= FOUR_HOURS_MS) {
-                overtimeHTML += row;
-            } else {
-                normalHTML += row;
-            }
+            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td style="font-weight:bold; color:var(--red-main)">P${currentFee}.00</td><td><span style="color:${timeElapsed >= FOUR_HOURS_MS ? 'red' : 'green'}">● ${timeElapsed >= FOUR_HOURS_MS ? 'OVERTIME' : 'PARKED'}</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+            if (timeElapsed >= FOUR_HOURS_MS) overtimeHTML += row; else normalHTML += row;
         });
-
         document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No active regular parking</td></tr>';
         document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No overtime vehicles</td></tr>';
     });
 
-    // --- ARCHIVE ENGINE ---
     window.moveToArchive = async (sourceCol, id) => {
         if(!confirm("Move to Recycle Bin?")) return;
         const docSnap = await getDoc(doc(db, sourceCol, id));
@@ -425,24 +411,12 @@ Thank you!
     window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
     window.clearCollection = async (col) => { if(confirm("EMPTY BIN?")) { const s = await getDocs(collection(db, col)); const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit(); }};
 
-    // --- KIOSK CHECK-IN & PRINT ---
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
-
-        const entryTime = new Date().toLocaleTimeString();
-        const date = new Date().toLocaleDateString();
-        const rawIn = Date.now();
-
-        await setDoc(doc(db, "active_parking", plate), { 
-            plate, 
-            entryTime, 
-            rawIn, 
-            date 
-        });
-
+        const entryTime = new Date().toLocaleTimeString(), date = new Date().toLocaleDateString(), rawIn = Date.now();
+        await setDoc(doc(db, "active_parking", plate), { plate, entryTime, rawIn, date });
         await printEntryTicket(plate, entryTime, date);
-
         document.getElementById('kiosk-feedback').innerText = "✅ PRINTING TICKET...";
         document.getElementById('kioskPlate').value = "";
         setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 3000);
@@ -451,16 +425,11 @@ Thank you!
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
 
-    // --- RENDERING ---
-    let historySnap = [];
-    let salesSnap = [];
-
+    let historySnap = [], salesSnap = [];
     const renderHistory = () => {
         document.getElementById('table-hist').innerHTML = historySnap.map(d => {
             const r = d.data();
-            const action = (currentUserRole === 'admin') 
-                ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` 
-                : `<td><span class="view-only-tag">View Only</span></td>`;
+            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
     };
@@ -468,12 +437,9 @@ Thank you!
     const renderSales = () => {
         let g = 0, t = 0; const todayStr = new Date().toLocaleDateString();
         document.getElementById('table-sale').innerHTML = salesSnap.map(d => {
-            const r = d.data(); 
-            const refNo = d.id.substring(0, 8).toUpperCase();
+            const r = d.data(); const refNo = d.id.substring(0, 8).toUpperCase();
             g += Number(r.pay); if(r.date === todayStr) t += Number(r.pay);
-            const action = (currentUserRole === 'admin') 
-                ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` 
-                : `<td><span class="view-only-tag">View Only</span></td>`;
+            const action = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️ Delete</button></td>` : `<td><span class="view-only-tag">View Only</span></td>`;
             return `<tr><td style="font-family:monospace; color:#666;">#${refNo}</td><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}.00</td><td>${r.date}</td>${action}</tr>`;
         }).reverse().join('');
         document.getElementById('grand-total').innerText = "P" + g.toFixed(2);
