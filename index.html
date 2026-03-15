@@ -256,7 +256,6 @@
 PLATE:    ${plate}
 DATE:     ${date}
 TIME IN:  ${entryTime}
---------------------------------
     PLEASE KEEP THIS TICKET
 `;
         const printed = await printReceipt(receiptStr);
@@ -332,9 +331,8 @@ TIME IN:  ${entryTime}
   const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
         const receiptStr = `
-  BAGONG SILANG
- Phs2, Langit Rd, Caloocan
-        Metro Manila
+METRO PLAZA
+Bagong Silang Branch
 -------------------------
 REF NO:    ${refNo}
 PLATE:     ${plate}
@@ -345,7 +343,6 @@ DURATION:  ${hrs} hr(s)
 -------------------------
 TOTAL FEE: P${payment}.00
 -------------------------
-Thank you!
 `;
         
         const printed = await printReceipt(receiptStr);
@@ -354,9 +351,6 @@ Thank you!
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
                     <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
-                    ><br>
-                    Phs2, Langit Rd, Caloocan<br>
-                    Metro Manila<br>
                     <div style="text-align:left;">
                         <b>REF NO: ${refNo}</b><br>
                         PLATE: ${plate}<br>
