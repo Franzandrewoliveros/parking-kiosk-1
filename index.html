@@ -40,6 +40,7 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         
+        /* DURATION COLOR BADGES */
         .duration-badge { padding: 5px 12px; border-radius: 50px; color: white; font-weight: bold; font-size: 0.8rem; }
         .dur-safe { background: var(--green-guard); }
         .dur-warning { background: var(--warning-orange); }
@@ -248,9 +249,9 @@
 `      METRO PLAZA
      BAGONG SILANG
  Phs2, Langit Rd, Caloocan
-      Metro Manila
+        Metro Manila
 --------------------------------
-         ENTRY TICKET
+          ENTRY TICKET
 --------------------------------
 PLATE:    ${plate}
 DATE:     ${date}
@@ -299,7 +300,14 @@ TIME IN:  ${entryTime}
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        let cssClass = (hrs >= 4) ? "dur-danger" : (hrs >= 2) ? "dur-warning" : "dur-safe";
+        
+        let cssClass = "dur-safe"; // Default Green (under 2 hours)
+        if (hrs >= 4) {
+            cssClass = "dur-danger"; // Red (4 hours or more)
+        } else if (hrs >= 2) {
+            cssClass = "dur-warning"; // Orange (2 hours to 3h 59m)
+        }
+
         return { text: `${hrs}h ${mins}m`, css: cssClass };
     }
 
@@ -317,57 +325,51 @@ TIME IN:  ${entryTime}
         const payment = calculatePayment(data.rawIn);
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
 
+        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
         const salesRef = await addDoc(collection(db, "sales_report"), { 
             plate, pay: payment, date: data.date, timestamp: Date.now() 
         });
         
-        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
-        const receiptStr = `
-      METRO PLAZA
+        const receiptStr = 
+`      METRO PLAZA
      BAGONG SILANG
  Phs2, Langit Rd, Caloocan
-      Metro Manila
 --------------------------------
-        RELEASE TICKET
+REF NO:   ${refNo}
+PLATE:    ${plate}
+DATE:     ${new Date().toLocaleDateString()}
+TIME IN:  ${data.entryTime}
+TIME OUT: ${outTime}
+DURATION: ${hrs} hr(s)
 --------------------------------
-REF NO:    ${refNo}
-PLATE:     ${plate}
-DATE:      ${new Date().toLocaleDateString()}
-TIME IN:   ${data.entryTime}
-TIME OUT:  ${outTime}
-DURATION:  ${hrs} hr(s)
+TOTAL FEE:    P${payment}.00
 --------------------------------
-TOTAL FEE: P${payment}.00
---------------------------------
-    THANK YOU FOR VISITING!
-       HAVE A SAFE RIDE!
+   THANK YOU & DRIVE SAFE!
 `;
         
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
-                <div style="text-align:center; font-size: 11px; line-height: 1.2; font-family: 'Courier New', monospace;">
+                <div style="text-align:center; font-size: 11px; line-height: 1.2;">
                     <strong style="font-size: 13px;">METRO PLAZA</strong><br>
                     <strong>BAGONG SILANG</strong><br>
                     Phs2, Langit Rd, Caloocan<br>
-                    Metro Manila<br>
                     ----------------------------<br>
                     <div style="text-align:left; margin-left: 5px;">
-                        <strong>REF: ${refNo}</strong><br>
-                        PLATE:    ${plate}<br>
-                        DATE:     ${new Date().toLocaleDateString()}<br>
-                        IN:       ${data.entryTime}<br>
-                        OUT:      ${outTime}<br>
-                        DURATION: ${hrs} hr(s)
+                        REF:   ${refNo}<br>
+                        PLATE: ${plate}<br>
+                        IN:    ${data.entryTime}<br>
+                        OUT:   ${outTime}<br>
+                        DUR:   ${hrs} hr(s)
                     </div>
                     ----------------------------<br>
                     <strong style="font-size: 14px;">TOTAL: P${payment}.00</strong><br>
                     ----------------------------<br>
-                    THANK YOU FOR VISITING!
+                    THANK YOU & DRIVE SAFE!
                 </div>`;
-            window.print();        
+            window.print();
         }
         await deleteDoc(doc(db, "active_parking", plate));
     };
