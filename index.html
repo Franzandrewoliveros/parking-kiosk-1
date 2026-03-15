@@ -283,9 +283,10 @@
         
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
+        // UPDATED: ADDRESS IN BLUETOOTH STRING
         const receiptStr = `
 METRO PLAZA
-Bagong Silang Branch
+Phs2, Langit Rd, Caloocan City
 -------------------------
 REF NO:    ${refNo}
 PLATE:     ${plate}
@@ -301,13 +302,14 @@ Thank you!
         
         const printed = await printReceipt(receiptStr);
         if (!printed) {
+            // UPDATED: ADDRESS IN HTML PRINT AREA
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:280px; padding:10px; background:white; margin: auto; color: black;">
                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" 
                          class="receipt-logo"
                          style="width: 70px; border-radius: 50%; filter: grayscale(1) contrast(500%) brightness(0.8); margin-bottom: 5px;">
-                    <h3 style="margin:0; font-size: 1.2rem;">METRO PLAZA</h3>
-                    <p style="margin:0; font-size: 0.8rem;">Bagong Silang Branch</p>
+                    <h3 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h3>
+                    <p style="margin:0; font-size: 0.75rem;">Phs2, Langit Rd, Caloocan, Metro Manila</p>
                     <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
                     <div style="text-align:left; font-size: 0.9rem;">
                         <b>REF NO: ${refNo}</b><br>
@@ -320,7 +322,7 @@ Thank you!
                     <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
                     <h2 style="margin: 5px 0;">TOTAL: P${payment}.00</h2>
                     <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
-                    <p style="font-size: 0.8rem;">THANK YOU AND DRIVE SAFELY!</p>
+                    <p style="font-size: 0.75rem;">THANK YOU AND DRIVE SAFELY!</p>
                 </div>`;
             window.print();
         }
