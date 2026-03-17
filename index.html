@@ -32,7 +32,7 @@
         .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; }
         .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
 
-        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; scroll-behavior: smooth; }
+        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         
         .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;}
@@ -59,28 +59,6 @@
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
-
-        /* FLOATING SCROLL BUTTON */
-        #scrollToTopBtn {
-            display: none;
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 99;
-            border: none;
-            outline: none;
-            background-color: var(--red-main);
-            color: white;
-            cursor: pointer;
-            padding: 15px;
-            border-radius: 50%;
-            font-size: 20px;
-            width: 55px;
-            height: 55px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        #scrollToTopBtn:hover { background-color: var(--red-dark); transform: scale(1.15); }
 
         @media print { 
             body * { visibility: hidden; } 
@@ -212,10 +190,7 @@
     </div>
 
     <div id="arch" class="tab-view admin-only" style="display:none">
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-arch', this.value)">
-            <button class="btn-clear" onclick="clearCollection('archive')">🧨 EMPTY BIN</button>
-        </div>
+        <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">🧨 EMPTY BIN</button>
         <div class="table-container">
             <table>
                 <thead><tr><th>PLATE</th><th>TYPE</th><th>DELETED AT</th><th>ACTION</th></tr></thead>
@@ -225,7 +200,6 @@
     </div>
 </div>
 
-<button onclick="topFunction()" id="scrollToTopBtn" title="Go to top">▲</button>
 <div id="print-area"></div>
 
 <script type="module">
@@ -246,22 +220,6 @@
     let currentUserRole = "guard"; 
     let printerCharacteristic = null;
     let activeParkingCache = [];
-
-    // SCROLL TO TOP LOGIC
-    const mybutton = document.getElementById("scrollToTopBtn");
-    const mainContent = document.getElementById("main-content");
-
-    mainContent.onscroll = function() {
-        if (mainContent.scrollTop > 300) {
-            mybutton.style.display = "block";
-        } else {
-            mybutton.style.display = "none";
-        }
-    };
-
-    window.topFunction = () => {
-        mainContent.scrollTo({ top: 0, behavior: 'smooth' });
-    };
 
     window.connectPrinter = async () => {
         try {
@@ -337,7 +295,14 @@ TIME IN:  ${entryTime}
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        let cssClass = (hrs >= 4) ? "dur-danger" : (hrs >= 2) ? "dur-warning" : "dur-safe";
+        
+        let cssClass = "dur-safe"; // Default Green (under 2 hours)
+        if (hrs >= 4) {
+            cssClass = "dur-danger"; // Red (4 hours or more)
+        } else if (hrs >= 2) {
+            cssClass = "dur-warning"; // Orange (2 hours to 3h 59m)
+        }
+
         return { text: `${hrs}h ${mins}m`, css: cssClass };
     }
 
@@ -350,6 +315,7 @@ TIME IN:  ${entryTime}
     window.checkOut = async (plate) => {
         const data = activeParkingCache.find(d => d.plate === plate);
         if(!data) return;
+        
         const outTime = new Date().toLocaleTimeString();
         const payment = calculatePayment(data.rawIn);
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
@@ -359,7 +325,8 @@ TIME IN:  ${entryTime}
             plate, pay: payment, date: data.date, timestamp: Date.now() 
         });
         
-        const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
+  const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
+
         const receiptStr = `
 METRO PLAZA
 Bagong Silang Branch
@@ -374,7 +341,9 @@ DURATION:  ${hrs} hr(s)
 TOTAL FEE: P${payment}.00
 -------------------------
 `;
+        
         const printed = await printReceipt(receiptStr);
+        
         if (!printed) {
             document.getElementById('print-area').innerHTML = `
                 <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
@@ -499,8 +468,7 @@ TOTAL FEE: P${payment}.00
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
-        document.getElementById('view-title').innerText = (el.innerText.trim().split(' ')[0] === "DASHBOARD" || el.innerText.trim() === "🔴 DASHBOARD") ? "PARKING OVERVIEW" : el.innerText.trim();
-        mainContent.scrollTop = 0; 
+        document.getElementById('view-title').innerText = el.innerText.trim().split(' ')[0] === "DASHBOARD" ? "PARKING OVERVIEW" : el.innerText.trim();
     };
 
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
