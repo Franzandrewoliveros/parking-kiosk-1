@@ -12,7 +12,7 @@
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
-        /* SECURE LOGIN OVERLAY */
+        /* LOGIN INTERFACE */
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
@@ -27,8 +27,14 @@
             border-top: 5px solid var(--red-main);
         }
 
+        .input-group { position: relative; width: 100%; margin-bottom: 15px; }
+        
         input[type="email"], input[type="password"], input[type="text"] {
-            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 15px; outline: none;
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; outline: none; font-size: 1rem;
+        }
+
+        .toggle-password {
+            position: absolute; right: 10px; top: 12px; cursor: pointer; color: #666; font-size: 0.9rem; user-select: none;
         }
 
         /* SIDEBAR & CONTENT */
@@ -45,10 +51,9 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         
-        .btn-main { width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; }
+        .btn-main { width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size: 1rem; }
         .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        .btn-delete { background: #444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
-
+        
         #scrollToTopBtn {
             display: none; position: fixed; bottom: 30px; right: 30px; z-index: 99;
             border: none; outline: none; background-color: var(--red-main);
@@ -72,7 +77,11 @@
         <p style="margin-bottom:25px; color:#555; font-weight: bold;">SECURE LOGIN</p>
         
         <input type="email" id="admin-email" placeholder="Email Address">
-        <input type="password" id="pass" placeholder="Password">
+        
+        <div class="input-group">
+            <input type="password" id="pass" placeholder="Password">
+            <span class="toggle-password" onclick="togglePass()">👁️ Show</span>
+        </div>
         
         <button onclick="loginAdmin()" class="btn-main">SIGN IN</button>
         
@@ -112,7 +121,7 @@
     </div>
 
     <div id="hist" class="tab-view" style="display:none">
-        <input type="text" style="width: 200px;" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
+        <input type="text" style="width: 200px; padding:8px; border-radius:5px; border:1px solid #ddd;" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
         <div class="table-container">
             <table>
                 <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
@@ -150,26 +159,39 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
+    // --- NEW: TOGGLE PASSWORD VISIBILITY ---
+    window.togglePass = () => {
+        const passInput = document.getElementById('pass');
+        const toggleBtn = document.querySelector('.toggle-password');
+        if (passInput.type === "password") {
+            passInput.type = "text";
+            toggleBtn.innerText = "🙈 Hide";
+        } else {
+            passInput.type = "password";
+            toggleBtn.innerText = "👁️ Show";
+        }
+    };
+
     // --- AUTH ACTIONS ---
     window.loginAdmin = async () => {
         const email = document.getElementById('admin-email').value;
         const pass = document.getElementById('pass').value;
         const loader = document.getElementById('login-loader');
-        if(!email || !pass) return alert("Fill in both fields");
+        if(!email || !pass) return alert("Please enter both email and password.");
         
         loader.style.display = "block";
         try {
             await signInWithEmailAndPassword(auth, email, pass);
-        } catch (e) { alert("Invalid Credentials"); }
+        } catch (e) { alert("Login failed. Please check your credentials."); }
         loader.style.display = "none";
     };
 
     window.forgotPassword = async () => {
         const email = document.getElementById('admin-email').value;
-        if (!email) return alert("Please enter your email address first.");
+        if (!email) return alert("Please type your email address first.");
         try {
             await sendPasswordResetEmail(auth, email);
-            alert("Reset link sent! Check your inbox.");
+            alert("Reset link sent! Please check your email inbox.");
         } catch (e) { alert(e.message); }
     };
 
@@ -180,13 +202,14 @@
         document.getElementById('main-content').style.display = isAuth ? 'block' : 'none';
         
         if(user) {
+            // ADMIN CHECK: Uses the email you created in the console
             const isAdmin = user.email === "admin@metro.ph";
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
             document.getElementById('user-role-tag').innerText = isAdmin ? "🔑 ADMIN" : "🛡️ GUARD";
         }
     });
 
-    window.logout = () => signOut(auth);
+    window.logout = () => { if(confirm("Log out of system?")) signOut(auth); };
 
     // --- NAVIGATION ---
     window.showTab = (id, el) => {
@@ -196,10 +219,9 @@
         el.classList.add('active');
     };
 
-    // --- SYSTEM CLOCK ---
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 
-    // --- DATA HANDLING ---
+    // --- DATA HANDLING (REAL-TIME) ---
     onSnapshot(collection(db, "active_parking"), snap => {
         document.getElementById('table-dash-normal').innerHTML = snap.docs.map(d => {
             const r = d.data();
@@ -207,7 +229,13 @@
         }).join('');
     });
 
-    // ... (Your existing checkOut, filterTable, and moveToBin logic goes here) ...
+    window.filterTable = (id, q) => {
+        document.querySelectorAll(`#${id} tr`).forEach(r => {
+            r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none";
+        });
+    }
+
+    window.topFunction = () => document.getElementById("main-content").scrollTo({ top: 0, behavior: 'smooth' });
 
 </script>
 </body>
