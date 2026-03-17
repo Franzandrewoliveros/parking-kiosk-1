@@ -2,17 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Metro Plaza Bagong Silang - Management System</title>
+    <title>Metro Plaza Management - Bluetooth Printing</title>
     <style>
         :root { 
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
-            --glass: rgba(255, 255, 255, 0.98); --text-light: #f5f5f5;
-            --green-guard: #2e7d32; --blue-archive: #1976d2;
+            --glass: rgba(255, 255, 255, 0.98);
         }
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
-        /* LOGIN INTERFACE */
+        /* LOGIN OVERLAY */
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
@@ -29,122 +28,73 @@
 
         .input-group { position: relative; width: 100%; margin-bottom: 15px; }
         
-        input[type="email"], input[type="password"], input[type="text"] {
-            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; outline: none; font-size: 1rem;
-        }
+        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; outline: none; }
 
-        .toggle-password {
-            position: absolute; right: 10px; top: 12px; cursor: pointer; color: #666; font-size: 0.9rem; user-select: none;
-        }
+        .toggle-password { position: absolute; right: 10px; top: 12px; cursor: pointer; color: #666; font-size: 0.8rem; }
 
-        /* SIDEBAR & CONTENT */
-        #sidebar { width: 280px; background: var(--dark-bg); color: white; display: none; flex-direction: column; z-index: 10; }
-        .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
-        .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; }
-        .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
+        /* SIDEBAR */
+        #sidebar { width: 280px; background: var(--dark-bg); color: white; display: none; flex-direction: column; }
+        .sidebar-brand { padding: 30px; background: var(--red-main); text-align: center; }
+        .nav-item { padding: 18px 25px; cursor: pointer; border-bottom: 1px solid #2a2a2a; color: #aaa; }
+        .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
 
-        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; scroll-behavior: smooth; }
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; display: none; }
         
-        .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;}
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
-        td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        .btn-main { width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; }
+        .btn-print { background: #444; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; width: 100%; }
         
-        .btn-main { width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size: 1rem; }
-        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
         
-        #scrollToTopBtn {
-            display: none; position: fixed; bottom: 30px; right: 30px; z-index: 99;
-            border: none; outline: none; background-color: var(--red-main);
-            color: white; cursor: pointer; padding: 15px; border-radius: 50%;
-            width: 55px; height: 55px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: 0.3s;
-        }
-
-        @media print { 
-            body * { visibility: hidden; } 
-            #print-area, #print-area * { visibility: visible; } 
-            #print-area { position: absolute; top: 0; left: 0; width: 48mm; } 
-        }
+        .status-tag { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+        .status-online { background: #e8f5e9; color: #2e7d32; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay" class="parking-bg">
     <div class="glass-card">
-        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 70px; border-radius: 50%; margin-bottom: 15px;">
-        <h1 style="color:var(--red-main); margin:0; font-size: 1.5rem;">METRO PLAZA</h1>
-        <p style="margin-bottom:25px; color:#555; font-weight: bold;">SECURE LOGIN</p>
-        
-        <input type="email" id="admin-email" placeholder="Email Address">
-        
+        <h1 style="color:var(--red-main);">METRO PLAZA</h1>
+        <div class="input-group"><input type="email" id="login-email" placeholder="admin@metro.ph"></div>
         <div class="input-group">
-            <input type="password" id="pass" placeholder="Password">
+            <input type="password" id="login-pass" placeholder="Password">
             <span class="toggle-password" onclick="togglePass()">👁️ Show</span>
         </div>
-        
-        <button onclick="loginAdmin()" class="btn-main">SIGN IN</button>
-        
-        <div style="margin-top: 15px;">
-            <a href="#" onclick="forgotPassword()" style="color: #666; font-size: 0.8rem; text-decoration: none;">Forgot Password?</a>
-        </div>
-
-        <div id="login-loader" style="display:none; margin-top:15px; color:var(--red-main); font-size: 0.85rem;">Authenticating...</div>
+        <button onclick="handleLogin()" class="btn-main">SIGN IN</button>
+        <p><a href="#" onclick="triggerReset()" style="color: #666; font-size: 0.8rem;">Forgot Password?</a></p>
     </div>
 </div>
 
 <div id="sidebar">
-    <div class="sidebar-brand">
-        <h2 style="margin:0;">METRO PLAZA</h2>
-        <small id="user-role-tag">SECURE ACCESS</small>
-    </div>
+    <div class="sidebar-brand"><h2>MANAGEMENT</h2><small id="role-display"></small></div>
     <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
     <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
-    <div class="nav-item admin-only" onclick="showTab('sale', this)">💰 SALES REPORT</div>
-    <div class="nav-item admin-only" onclick="showTab('arch', this)" style="background: #263238;">♻️ RECYCLE BIN</div>
-    <div class="nav-item" onclick="logout()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
+    <div class="nav-item admin-only" onclick="showTab('sale', this)">💰 SALES</div>
+    <div class="nav-item" onclick="logout()" style="margin-top:auto; background:#b71c1c;">LOGOUT</div>
 </div>
 
 <div id="main-content">
-    <div class="header-bar">
-        <h2 id="view-title">PARKING OVERVIEW</h2>
-        <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Parking Dashboard</h2>
+        <button class="btn-print" id="btn-connect" style="width: auto; padding: 10px 20px;">🔌 CONNECT PRINTER</button>
+    </div>
+    
+    <div id="printer-status" style="margin-bottom: 20px;">
+        <span class="status-tag" id="status-text">Printer Disconnected</span>
     </div>
 
     <div id="dash" class="tab-view">
-        <div class="table-container">
-            <table>
-                <thead><tr><th>PLATE</th><th>TIME IN</th><th>FEE</th><th>ACTION</th></tr></thead>
-                <tbody id="table-dash-normal"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="hist" class="tab-view" style="display:none">
-        <input type="text" style="width: 200px; padding:8px; border-radius:5px; border:1px solid #ddd;" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
-        <div class="table-container">
-            <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th class="admin-only">ACTION</th></tr></thead>
-                <tbody id="table-hist"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="sale" class="tab-view admin-only" style="display:none">
-        <div class="table-container"><table id="table-sale"></table></div>
-    </div>
-
-    <div id="arch" class="tab-view admin-only" style="display:none">
-        <div class="table-container"><table id="table-arch"></table></div>
+        <table>
+            <thead><tr><th>PLATE</th><th>IN</th><th>ACTION</th></tr></thead>
+            <tbody id="active-list"></tbody>
+        </table>
     </div>
 </div>
 
-<button onclick="topFunction()" id="scrollToTopBtn">▲</button>
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot, writeBatch, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, doc, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
@@ -156,43 +106,62 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
     const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    // --- NEW: TOGGLE PASSWORD VISIBILITY ---
-    window.togglePass = () => {
-        const passInput = document.getElementById('pass');
-        const toggleBtn = document.querySelector('.toggle-password');
-        if (passInput.type === "password") {
-            passInput.type = "text";
-            toggleBtn.innerText = "🙈 Hide";
-        } else {
-            passInput.type = "password";
-            toggleBtn.innerText = "👁️ Show";
+    let printCharacteristic;
+
+    // --- BLUETOOTH PRINTER LOGIC ---
+    document.getElementById('btn-connect').addEventListener('click', async () => {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
+            });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            printCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+            
+            document.getElementById('status-text').innerText = "Printer Connected: " + device.name;
+            document.getElementById('status-text').className = "status-tag status-online";
+        } catch (e) { alert("Bluetooth Error: " + e.message); }
+    });
+
+    async function printReceipt(data) {
+        if (!printCharacteristic) {
+            alert("Printer not connected! Using browser print instead.");
+            window.print();
+            return;
         }
-    };
 
-    // --- AUTH ACTIONS ---
-    window.loginAdmin = async () => {
-        const email = document.getElementById('admin-email').value;
-        const pass = document.getElementById('pass').value;
-        const loader = document.getElementById('login-loader');
-        if(!email || !pass) return alert("Please enter both email and password.");
-        
-        loader.style.display = "block";
-        try {
-            await signInWithEmailAndPassword(auth, email, pass);
-        } catch (e) { alert("Login failed. Please check your credentials."); }
-        loader.style.display = "none";
-    };
+        const encoder = new TextEncoder();
+        const esc = '\x1B';
+        const commands = [
+            '\x1B\x40',          // Initialize
+            '\x1B\x61\x01',      // Center align
+            'METRO PLAZA\n',
+            'Bagong Silang Branch\n',
+            '--------------------------------\n',
+            '\x1B\x61\x00',      // Left align
+            `Plate: ${data.plate}\n`,
+            `Time In: ${data.entryTime}\n`,
+            `Time Out: ${new Date().toLocaleTimeString()}\n`,
+            `Total Fee: P20.00\n`,
+            '--------------------------------\n',
+            '\x1B\x61\x01',      // Center
+            'Thank you for parking!\n\n\n\n'
+        ];
 
-    window.forgotPassword = async () => {
-        const email = document.getElementById('admin-email').value;
-        if (!email) return alert("Please type your email address first.");
-        try {
-            await sendPasswordResetEmail(auth, email);
-            alert("Reset link sent! Please check your email inbox.");
-        } catch (e) { alert(e.message); }
+        for (const cmd of commands) {
+            await printCharacteristic.writeValue(encoder.encode(cmd));
+        }
+    }
+
+    // --- AUTH & DATA LOGIC ---
+    window.handleLogin = async () => {
+        const e = document.getElementById('login-email').value;
+        const p = document.getElementById('login-pass').value;
+        try { await signInWithEmailAndPassword(auth, e, p); } 
+        catch (err) { alert("Invalid login."); }
     };
 
     onAuthStateChanged(auth, user => {
@@ -200,43 +169,44 @@
         document.getElementById('login-overlay').style.display = isAuth ? 'none' : 'flex';
         document.getElementById('sidebar').style.display = isAuth ? 'flex' : 'none';
         document.getElementById('main-content').style.display = isAuth ? 'block' : 'none';
-        
         if(user) {
-            // ADMIN CHECK: Uses the email you created in the console
             const isAdmin = user.email === "admin@metro.ph";
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
-            document.getElementById('user-role-tag').innerText = isAdmin ? "🔑 ADMIN" : "🛡️ GUARD";
+            document.getElementById('role-display').innerText = isAdmin ? "🔑 ADMIN" : "🛡️ GUARD";
         }
     });
 
-    window.logout = () => { if(confirm("Log out of system?")) signOut(auth); };
+    onSnapshot(collection(db, "active_parking"), snap => {
+        document.getElementById('active-list').innerHTML = snap.docs.map(d => {
+            const r = d.data();
+            return `<tr>
+                <td><b>${r.plate}</b></td>
+                <td>${r.entryTime}</td>
+                <td><button class="btn-main" onclick="releaseCar('${d.id}', '${r.plate}', '${r.entryTime}')">RELEASE & PRINT</button></td>
+            </tr>`;
+        }).join('');
+    });
 
-    // --- NAVIGATION ---
+    window.releaseCar = async (id, plate, timeIn) => {
+        if(confirm(`Release ${plate}?`)) {
+            const data = { plate, entryTime: timeIn, fee: "P20.00" };
+            await printReceipt(data); // TRIGGER BLUETOOTH PRINT
+            await deleteDoc(doc(db, "active_parking", id));
+            await addDoc(collection(db, "parking_history"), data);
+        }
+    };
+
+    window.logout = () => signOut(auth);
+    window.togglePass = () => {
+        const p = document.getElementById('login-pass');
+        p.type = p.type === 'password' ? 'text' : 'password';
+    };
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
     };
-
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
-
-    // --- DATA HANDLING (REAL-TIME) ---
-    onSnapshot(collection(db, "active_parking"), snap => {
-        document.getElementById('table-dash-normal').innerHTML = snap.docs.map(d => {
-            const r = d.data();
-            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>P20.00</td><td><button class="btn-release" onclick="checkOut('${d.id}')">RELEASE</button></td></tr>`;
-        }).join('');
-    });
-
-    window.filterTable = (id, q) => {
-        document.querySelectorAll(`#${id} tr`).forEach(r => {
-            r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none";
-        });
-    }
-
-    window.topFunction = () => document.getElementById("main-content").scrollTo({ top: 0, behavior: 'smooth' });
-
 </script>
 </body>
 </html>
