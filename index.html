@@ -104,7 +104,6 @@
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .total-bar { background: var(--dark-bg); color: white; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; }
 
-        /* FIXED: Hidden by default to prevent overlap  */
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
@@ -236,12 +235,21 @@
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" id="search-sale" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
+            <input type="text" id="search-ref" class="search-box" placeholder="Search Ref ID..." onkeyup="filterTable('table-sale', this.value)">
             <input type="date" id="date-sale" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
             <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
         <div class="table-container">
             <table>
-                <thead><tr><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>REF ID</th>
+                        <th>PLATE</th>
+                        <th>TOTAL FEE</th>
+                        <th>DATE</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
                 <tbody id="table-sale"></tbody>
             </table>
         </div>
@@ -306,7 +314,6 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // --- SECURE CREDENTIALS ---
     let sysCreds = { guardPIN: "12345", adminPIN: "0526", recoveryKey: "METRO2026" };
     const syncCreds = async () => {
         const docRef = doc(db, "system_settings", "access_control");
@@ -321,7 +328,6 @@
     };
     syncCreds();
 
-    // --- PRINTER UTILS ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
@@ -344,7 +350,6 @@
         } catch (e) { return false; }
     };
 
-    // --- ENTRY TICKET LOGIC ---
     const printEntryTicket = async (plate, entryTime, date) => {
         const receiptStr = `\x1B\x61\x01METRO PLAZA\nBAGONG SILANG BRANCH\n--------------------------------\nENTRY TICKET\n--------------------------------\nPLATE: ${plate}\nDATE: ${date}\nTIME IN: ${entryTime}\n\n\n`;
         const printed = await printReceipt(receiptStr);
@@ -373,9 +378,7 @@
     window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; };
     window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
 
-    // --- CHECKOUT LOGIC ---
     function calculatePayment(msIn) {
-        // FIXED: Updated Pricing (20 for 4hrs, 10 per add hr) 
         const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
         const totalHrs = Math.max(1, hrsElapsed);
         return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
@@ -400,7 +403,6 @@
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
-    // --- SECURITY & UI HELPERS ---
     window.updatePIN = async (type) => {
         const inputId = type === 'guard' ? 'new-guard-pin' : 'new-admin-pin';
         const pinVal = document.getElementById(inputId).value.trim();
@@ -450,14 +452,12 @@
     window.filterTable = (tableId, query) => { const rows = document.getElementById(tableId).getElementsByTagName('tr'); for (let row of rows) { row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none"; } };
     window.filterByDate = (tableId, dateVal) => { if(!dateVal) return; const formatted = new Date(dateVal).toLocaleDateString(); const rows = document.getElementById(tableId).getElementsByTagName('tr'); for (let row of rows) { row.style.display = row.innerText.includes(formatted) ? "" : "none"; } };
 
-    // --- ARCHIVE UTILS ---
     window.moveToArchive = async (colName, id) => { if(!confirm("Move to Recycle Bin?")) return; try { const docRef = doc(db, colName, id); const snap = await getDoc(docRef); if (snap.exists()) { await addDoc(collection(db, "archive"), { ...snap.data(), originalCol: colName, deletedAt: Date.now() }); await deleteDoc(docRef); } } catch (e) { alert(e.message); } };
     window.restoreFromArchive = async (id) => { try { const docRef = doc(db, "archive", id); const snap = await getDoc(docRef); if (snap.exists()) { const data = snap.data(); const targetCol = data.originalCol; const resData = { ...data }; delete resData.originalCol; delete resData.deletedAt; await addDoc(collection(db, targetCol), resData); await deleteDoc(docRef); } } catch (e) { alert(e.message); } };
     window.deleteForever = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
     window.clearCollection = async (name) => { if(!confirm("Empty entire bin?")) return; const snap = await getDocs(collection(db, name)); const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref)); await batch.commit(); };
     window.archiveEntireCollection = async (colName) => { if(!confirm("Archive all?")) return; const snap = await getDocs(collection(db, colName)); const batch = writeBatch(db); for(let d of snap.docs) { await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: Date.now() }); batch.delete(d.ref); } await batch.commit(); };
 
-    // --- SNAPSHOT LISTENERS ---
     onSnapshot(collection(db, "active_parking"), snap => {
         activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
         let normalHTML = "", overtimeHTML = "";
@@ -480,16 +480,27 @@
     onSnapshot(collection(db, "sales_report"), snap => {
         let todayT = 0; let grandT = 0; const today = new Date().toLocaleDateString();
         document.getElementById('table-sale').innerHTML = snap.docs.map(d => {
-            const r = d.data(); grandT += r.pay; if(r.date === today) todayT += r.pay;
-            // FIXED: Removed Ref ID from Sales report rows 
-            return `<tr><td><b>${r.plate}</b></td><td>P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td></tr>`;
+            const r = d.data(); 
+            grandT += r.pay; 
+            if(r.date === today) todayT += r.pay;
+            const refNo = d.id.substring(0, 8).toUpperCase();
+            return `<tr>
+                <td><small style="color:#666; font-family:monospace;">${refNo}</small></td>
+                <td><b>${r.plate}</b></td>
+                <td>P${r.pay}.00</td>
+                <td>${r.date}</td>
+                <td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td>
+            </tr>`;
         }).join('');
         document.getElementById('today-total').innerText = "P" + todayT.toLocaleString() + ".00";
         document.getElementById('grand-total').innerText = "P" + grandT.toLocaleString() + ".00";
     });
 
     onSnapshot(collection(db, "archive"), snap => {
-        document.getElementById('table-arch').innerHTML = snap.docs.map(d => { const r = d.data(); return `<tr><td><b>${r.plate}</b></td><td>${(r.originalCol || '').replace('_', ' ').toUpperCase()}</td><td>${new Date(r.deletedAt).toLocaleString()}</td><td><button class="btn-restore" onclick="restoreFromArchive('${d.id}')">↺ RESTORE</button><button class="btn-delete" onclick="deleteForever('${d.id}')">❌</button></td></tr>`; }).join('');
+        document.getElementById('table-arch').innerHTML = snap.docs.map(d => { 
+            const r = d.data(); 
+            return `<tr><td><b>${r.plate}</b></td><td>${(r.originalCol || '').replace('_', ' ').toUpperCase()}</td><td>${new Date(r.deletedAt).toLocaleString()}</td><td><button class="btn-restore" onclick="restoreFromArchive('${d.id}')">↺ RESTORE</button><button class="btn-delete" onclick="deleteForever('${d.id}')">❌</button></td></tr>`; 
+        }).join('');
     });
 
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
