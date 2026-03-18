@@ -486,19 +486,40 @@ TOTAL FEE: P${payment}.00
     window.archiveEntireCollection = async (colName) => { if(!confirm("Archive all?")) return; const snap = await getDocs(collection(db, colName)); const batch = writeBatch(db); for(let d of snap.docs) { await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: Date.now() }); batch.delete(d.ref); } await batch.commit(); };
 
     onSnapshot(collection(db, "active_parking"), snap => {
-        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        let normalHTML = "", overtimeHTML = "";
-        activeParkingCache.forEach(r => {
-            const elapsed = Date.now() - r.rawIn;
-            const hrs = Math.floor(elapsed / 3600000);
-            const mins = Math.floor((elapsed % 3600000) / 60000);
-            const isOT = elapsed >= 14400000;
-            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${isOT ? 'dur-danger' : 'dur-safe'}">${hrs}h ${mins}m</span></td><td>P${calculatePayment(r.rawIn)}.00</td><td>${isOT ? 'OVERTIME' : 'PARKED'}</td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
-            if (isOT) overtimeHTML += row; else normalHTML += row;
-        });
-        document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center">No active vehicles</td></tr>';
-        document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center">No overtime vehicles</td></tr>';
+    activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+    let normalHTML = "", overtimeHTML = "";
+
+    activeParkingCache.forEach(r => {
+        const elapsed = Date.now() - r.rawIn;
+        const hrs = Math.floor(elapsed / 3600000);
+        const mins = Math.floor((elapsed % 3600000) / 60000);
+        
+        // Duration Logic
+        let badgeClass = "dur-safe"; // Default Green (0-2h)
+        if (elapsed >= 14400000) {
+            badgeClass = "dur-danger"; // Red (4h+)
+        } else if (elapsed >= 7200000) {
+            badgeClass = "dur-warning"; // Orange (2h - 3:59h)
+        }
+
+        const isOT = elapsed >= 14400000;
+        
+        const row = `<tr>
+            <td><b>${r.plate}</b></td>
+            <td>${r.entryTime}</td>
+            <td><span class="duration-badge ${badgeClass}">${hrs}h ${mins}m</span></td>
+            <td>P${calculatePayment(r.rawIn)}.00</td>
+            <td>${isOT ? 'OVERTIME' : 'PARKED'}</td>
+            <td>${r.date}</td>
+            <td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td>
+        </tr>`;
+
+        if (isOT) overtimeHTML += row; else normalHTML += row;
     });
+
+    document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center">No active vehicles</td></tr>';
+    document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center">No overtime vehicles</td></tr>';
+});
 
     onSnapshot(collection(db, "parking_history"), snap => {
         document.getElementById('table-hist').innerHTML = snap.docs.map(d => { const r = d.data(); const actionHTML = (currentUserRole === "admin") ? `<button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ ARCHIVE</button>` : `<span style="color:#999; font-size:0.8rem;">View Only</span>`; return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td>${actionHTML}</td></tr>`; }).join('');
