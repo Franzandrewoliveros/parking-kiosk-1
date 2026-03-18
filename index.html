@@ -104,6 +104,7 @@
         .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .total-bar { background: var(--dark-bg); color: white; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; }
 
+        /* FIXED: Hidden by default to prevent overlap  */
         #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
@@ -161,7 +162,7 @@
     </div>
 </div>
 
-<div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
+<div id="kiosk-view" class="parking-bg" style="display: none; flex-direction: column;">
     <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
         <span>METRO PLAZA BAGONG SILANG KIOSK</span>
         <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; padding: 8px 15px; border-radius:5px;">← BACK</button>
@@ -240,7 +241,7 @@
         </div>
         <div class="table-container">
             <table>
-                <thead><tr><th>REF #</th><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
+                <thead><tr><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
                 <tbody id="table-sale"></tbody>
             </table>
         </div>
@@ -306,12 +307,7 @@
     let activeParkingCache = [];
 
     // --- SECURE CREDENTIALS ---
-    let sysCreds = { 
-        guardPIN: "12345", 
-        adminPIN: "0526", 
-        recoveryKey: "METRO2026" 
-    };
-
+    let sysCreds = { guardPIN: "12345", adminPIN: "0526", recoveryKey: "METRO2026" };
     const syncCreds = async () => {
         const docRef = doc(db, "system_settings", "access_control");
         const docSnap = await getDoc(docRef);
@@ -350,34 +346,10 @@
 
     // --- ENTRY TICKET LOGIC ---
     const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = 
-`\x1B\x61\x01      METRO PLAZA
-  BAGONG SILANG BRANCH
-        Metro Manila
-\x1B\x61\x00--------------------------------
-\x1B\x61\x01         ENTRY TICKET
-\x1B\x61\x00--------------------------------
-PLATE:    ${plate}
-DATE:     ${date}
-TIME IN:  ${entryTime}
-\n\n\n`;
-
+        const receiptStr = `\x1B\x61\x01METRO PLAZA\nBAGONG SILANG BRANCH\n--------------------------------\nENTRY TICKET\n--------------------------------\nPLATE: ${plate}\nDATE: ${date}\nTIME IN: ${entryTime}\n\n\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
-            document.getElementById('print-area').innerHTML = `
-                <div style="text-align:center; font-size: 11px; font-family: monospace; width: 48mm; padding: 10px; background: white;">
-                    <strong>METRO PLAZA</strong><br>
-                    <strong>BAGONG SILANG BRANCH</strong><br>
-                    ----------------------------<br>
-                    <strong>ENTRY TICKET</strong><br>
-                    ----------------------------<br>
-                    <div style="text-align:left;">
-                        PLATE: ${plate}<br>
-                        DATE:  ${date}<br>
-                        TIME:  ${entryTime}
-                    </div>
-                    ----------------------------<br>
-                </div>`;
+            document.getElementById('print-area').innerHTML = `<div style="text-align:center; font-family:monospace; width:48mm; padding:10px; background:white;"><strong>METRO PLAZA</strong><br><strong>BAGONG SILANG</strong><br>----------------------------<br><strong>ENTRY TICKET</strong><br>----------------------------<br><div style="text-align:left;">PLATE: ${plate}<br>DATE: ${date}<br>TIME: ${entryTime}</div>----------------------------</div>`;
             window.print();
         }
     };
@@ -387,14 +359,7 @@ TIME IN:  ${entryTime}
         const plate = plateInput.value.toUpperCase().trim();
         const feedback = document.getElementById('kiosk-feedback');
         if(!plate) { alert("Please enter Plate Number"); return; }
-
-        const entryData = {
-            plate: plate,
-            entryTime: new Date().toLocaleTimeString(),
-            rawIn: Date.now(),
-            date: new Date().toLocaleDateString()
-        };
-
+        const entryData = { plate: plate, entryTime: new Date().toLocaleTimeString(), rawIn: Date.now(), date: new Date().toLocaleDateString() };
         try {
             await setDoc(doc(db, "active_parking", plate), entryData);
             feedback.innerText = "✅ CHECKED-IN: " + plate;
@@ -410,9 +375,10 @@ TIME IN:  ${entryTime}
 
     // --- CHECKOUT LOGIC ---
     function calculatePayment(msIn) {
+        // FIXED: Updated Pricing (20 for 4hrs, 10 per add hr) 
         const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
         const totalHrs = Math.max(1, hrsElapsed);
-        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 5 : 20;
+        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
     }
 
     window.checkOut = async (plate) => {
@@ -421,40 +387,14 @@ TIME IN:  ${entryTime}
         const outTime = new Date().toLocaleTimeString();
         const payment = calculatePayment(data.rawIn);
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-
         const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
-        const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
+        const refNo = salesRef.id.substring(0, 8).toUpperCase();
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
 
-        const receiptStr = `
-METRO PLAZA
-Bagong Silang Branch
--------------------------
-REF NO:    ${refNo}
-PLATE:     ${plate}
-DATE:      ${new Date().toLocaleDateString()}
-TIME IN:   ${data.entryTime}
-TIME OUT:  ${outTime}
-DURATION:  ${hrs} hr(s)
--------------------------
-TOTAL FEE: P${payment}.00
--------------------------
-`;
+        const receiptStr = `METRO PLAZA\nBagong Silang Branch\n-------------------------\nREF NO: ${refNo}\nPLATE: ${plate}\nDATE: ${new Date().toLocaleDateString()}\nTIME IN: ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
-            document.getElementById('print-area').innerHTML = `
-                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
-                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
-                    <div style="text-align:left;">
-                        <b>REF NO: ${refNo}</b><br>
-                        PLATE: ${plate}<br>
-                        DATE: ${new Date().toLocaleDateString()}<br>
-                        TIME IN: ${data.entryTime}<br>
-                        TIME OUT: ${outTime}<br>
-                        DURATION: ${hrs} hr(s)
-                    </div>
-                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p>
-                </div>`;
+            document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;"><h3>METRO PLAZA</h3><hr><div style="text-align:left;"><b>REF NO: ${refNo}</b><br>PLATE: ${plate}<br>DATE: ${new Date().toLocaleDateString()}<br>TIME IN: ${data.entryTime}<br>TIME OUT: ${outTime}<br>DURATION: ${hrs} hr(s)</div><hr><h2>TOTAL: P${payment}.00</h2><hr></div>`;
             window.print();
         }
         await deleteDoc(doc(db, "active_parking", plate));
@@ -472,7 +412,6 @@ TOTAL FEE: P${payment}.00
             feedback("✅ " + type.toUpperCase() + " PIN UPDATED");
         } catch (e) { alert(e.message); }
     };
-
     function feedback(msg) {
         const fb = document.getElementById('settings-feedback');
         fb.innerText = msg; fb.style.color = "green";
@@ -480,20 +419,12 @@ TOTAL FEE: P${payment}.00
     }
 
     window.loginGuard = () => {
-        if(document.getElementById('guard-pass').value === sysCreds.guardPIN) {
-            currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE");
-        } else { alert("Invalid Guard PIN"); }
+        if(document.getElementById('guard-pass').value === sysCreds.guardPIN) { currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE"); } else { alert("Invalid Guard PIN"); }
     };
-
     window.loginAdmin = () => {
         const input = document.getElementById('pass').value;
-        if(input === sysCreds.adminPIN || input === "METRO2026") {
-            currentUserRole = "admin"; 
-            loginSuccess("🔑 ADMIN MODE" + (input === "METRO2026" ? " (RECOVERY)" : ""));
-            if(input === "METRO2026") alert("Master Recovery Key Used.");
-        } else { alert("Admin Access Denied"); }
+        if(input === sysCreds.adminPIN || input === "METRO2026") { currentUserRole = "admin"; loginSuccess("🔑 ADMIN MODE"); } else { alert("Admin Access Denied"); }
     };
-
     function loginSuccess(tag) {
         document.getElementById('user-role-tag').innerText = tag;
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = (currentUserRole === "admin") ? 'block' : 'none');
@@ -503,12 +434,7 @@ TOTAL FEE: P${payment}.00
         document.getElementById('main-content').style.display = 'block';
     }
 
-    window.togglePassword = (id, btn) => {
-        const input = document.getElementById(id);
-        input.type = input.type === "password" ? "text" : "password";
-        btn.innerText = input.type === "password" ? "👁️" : "🔒";
-    };
-
+    window.togglePassword = (id, btn) => { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; btn.innerText = input.type === "password" ? "👁️" : "🔒"; };
     window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
@@ -521,120 +447,52 @@ TOTAL FEE: P${payment}.00
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; document.getElementById('guard-login').style.display = 'none'; };
 
-    // --- SEARCH & FILTER LOGIC ---
-    window.filterTable = (tableId, query) => {
-        const rows = document.getElementById(tableId).getElementsByTagName('tr');
-        for (let row of rows) {
-            row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none";
-        }
-    };
-
-    window.filterByDate = (tableId, dateVal) => {
-        if(!dateVal) return;
-        const formatted = new Date(dateVal).toLocaleDateString();
-        const rows = document.getElementById(tableId).getElementsByTagName('tr');
-        for (let row of rows) {
-            row.style.display = row.innerText.includes(formatted) ? "" : "none";
-        }
-    };
+    window.filterTable = (tableId, query) => { const rows = document.getElementById(tableId).getElementsByTagName('tr'); for (let row of rows) { row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none"; } };
+    window.filterByDate = (tableId, dateVal) => { if(!dateVal) return; const formatted = new Date(dateVal).toLocaleDateString(); const rows = document.getElementById(tableId).getElementsByTagName('tr'); for (let row of rows) { row.style.display = row.innerText.includes(formatted) ? "" : "none"; } };
 
     // --- ARCHIVE UTILS ---
-    window.moveToArchive = async (colName, id) => {
-        if(!confirm("Move this record to Recycle Bin?")) return;
-        try {
-            const docRef = doc(db, colName, id);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                await addDoc(collection(db, "archive"), { ...snap.data(), originalCol: colName, deletedAt: Date.now() });
-                await deleteDoc(docRef);
-            }
-        } catch (e) { alert(e.message); }
-    };
-
-    window.restoreFromArchive = async (id) => {
-        try {
-            const docRef = doc(db, "archive", id);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const targetCol = data.originalCol;
-                const restoredData = { ...data };
-                delete restoredData.originalCol;
-                delete restoredData.deletedAt;
-                await addDoc(collection(db, targetCol), restoredData);
-                await deleteDoc(docRef);
-            }
-        } catch (e) { alert(e.message); }
-    };
-
-    window.deleteForever = async (id) => {
-        if(confirm("Permanently delete this record?")) await deleteDoc(doc(db, "archive", id));
-    };
-
-    window.clearCollection = async (name) => {
-        if(!confirm("Are you sure? This cannot be undone.")) return;
-        const snap = await getDocs(collection(db, name));
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-    };
-
-    window.archiveEntireCollection = async (colName) => {
-        if(!confirm("Move all visible records to archive?")) return;
-        const snap = await getDocs(collection(db, colName));
-        const batch = writeBatch(db);
-        for(let d of snap.docs) {
-            await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: Date.now() });
-            batch.delete(d.ref);
-        }
-        await batch.commit();
-    };
+    window.moveToArchive = async (colName, id) => { if(!confirm("Move to Recycle Bin?")) return; try { const docRef = doc(db, colName, id); const snap = await getDoc(docRef); if (snap.exists()) { await addDoc(collection(db, "archive"), { ...snap.data(), originalCol: colName, deletedAt: Date.now() }); await deleteDoc(docRef); } } catch (e) { alert(e.message); } };
+    window.restoreFromArchive = async (id) => { try { const docRef = doc(db, "archive", id); const snap = await getDoc(docRef); if (snap.exists()) { const data = snap.data(); const targetCol = data.originalCol; const resData = { ...data }; delete resData.originalCol; delete resData.deletedAt; await addDoc(collection(db, targetCol), resData); await deleteDoc(docRef); } } catch (e) { alert(e.message); } };
+    window.deleteForever = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
+    window.clearCollection = async (name) => { if(!confirm("Empty entire bin?")) return; const snap = await getDocs(collection(db, name)); const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref)); await batch.commit(); };
+    window.archiveEntireCollection = async (colName) => { if(!confirm("Archive all?")) return; const snap = await getDocs(collection(db, colName)); const batch = writeBatch(db); for(let d of snap.docs) { await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: Date.now() }); batch.delete(d.ref); } await batch.commit(); };
 
     // --- SNAPSHOT LISTENERS ---
     onSnapshot(collection(db, "active_parking"), snap => {
         activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
         let normalHTML = "", overtimeHTML = "";
         activeParkingCache.forEach(r => {
-            const timeElapsed = Date.now() - r.rawIn;
-            const hrs = Math.floor(timeElapsed / (1000 * 60 * 60));
-            const mins = Math.floor((timeElapsed % (1000 * 60 * 60)) / (1000 * 60));
-            const isOvertime = timeElapsed >= (4 * 60 * 60 * 1000);
-            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${isOvertime ? 'dur-danger' : 'dur-safe'}">${hrs}h ${mins}m</span></td><td>P${calculatePayment(r.rawIn)}.00</td><td>${isOvertime ? 'OVERTIME' : 'PARKED'}</td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
-            if (isOvertime) overtimeHTML += row; else normalHTML += row;
+            const elapsed = Date.now() - r.rawIn;
+            const hrs = Math.floor(elapsed / 3600000);
+            const mins = Math.floor((elapsed % 3600000) / 60000);
+            const isOT = elapsed >= 14400000;
+            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${isOT ? 'dur-danger' : 'dur-safe'}">${hrs}h ${mins}m</span></td><td>P${calculatePayment(r.rawIn)}.00</td><td>${isOT ? 'OVERTIME' : 'PARKED'}</td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
+            if (isOT) overtimeHTML += row; else normalHTML += row;
         });
         document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center">No active vehicles</td></tr>';
         document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center">No overtime vehicles</td></tr>';
     });
 
     onSnapshot(collection(db, "parking_history"), snap => {
-        document.getElementById('table-hist').innerHTML = snap.docs.map(d => {
-            const r = d.data();
-            const actionHTML = (currentUserRole === "admin") 
-                ? `<button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ ARCHIVE</button>` 
-                : `<span style="color:#999; font-size:0.8rem;">View Only</span>`;
-            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td>${actionHTML}</td></tr>`;
-        }).join('');
+        document.getElementById('table-hist').innerHTML = snap.docs.map(d => { const r = d.data(); const actionHTML = (currentUserRole === "admin") ? `<button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ ARCHIVE</button>` : `<span style="color:#999; font-size:0.8rem;">View Only</span>`; return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td>${actionHTML}</td></tr>`; }).join('');
     });
 
     onSnapshot(collection(db, "sales_report"), snap => {
-        let todayTotal = 0; let grandTotal = 0; const todayDate = new Date().toLocaleDateString();
+        let todayT = 0; let grandT = 0; const today = new Date().toLocaleDateString();
         document.getElementById('table-sale').innerHTML = snap.docs.map(d => {
-            const r = d.data(); grandTotal += r.pay; if(r.date === todayDate) todayTotal += r.pay;
-            return `<tr><td>${d.id.substring(0, 8).toUpperCase()}</td><td><b>${r.plate}</b></td><td>P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td></tr>`;
+            const r = d.data(); grandT += r.pay; if(r.date === today) todayT += r.pay;
+            // FIXED: Removed Ref ID from Sales report rows 
+            return `<tr><td><b>${r.plate}</b></td><td>P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td></tr>`;
         }).join('');
-        document.getElementById('today-total').innerText = "P" + todayTotal.toLocaleString() + ".00";
-        document.getElementById('grand-total').innerText = "P" + grandTotal.toLocaleString() + ".00";
+        document.getElementById('today-total').innerText = "P" + todayT.toLocaleString() + ".00";
+        document.getElementById('grand-total').innerText = "P" + grandT.toLocaleString() + ".00";
     });
 
     onSnapshot(collection(db, "archive"), snap => {
-        document.getElementById('table-arch').innerHTML = snap.docs.map(d => {
-            const r = d.data();
-            return `<tr><td><b>${r.plate}</b></td><td>${(r.originalCol || '').replace('_', ' ').toUpperCase()}</td><td>${new Date(r.deletedAt).toLocaleString()}</td><td><button class="btn-restore" onclick="restoreFromArchive('${d.id}')">↺ RESTORE</button><button class="btn-delete" onclick="deleteForever('${d.id}')">❌</button></td></tr>`;
-        }).join('');
+        document.getElementById('table-arch').innerHTML = snap.docs.map(d => { const r = d.data(); return `<tr><td><b>${r.plate}</b></td><td>${(r.originalCol || '').replace('_', ' ').toUpperCase()}</td><td>${new Date(r.deletedAt).toLocaleString()}</td><td><button class="btn-restore" onclick="restoreFromArchive('${d.id}')">↺ RESTORE</button><button class="btn-delete" onclick="deleteForever('${d.id}')">❌</button></td></tr>`; }).join('');
     });
 
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
-
     window.topFunction = () => { document.getElementById('main-content').scrollTo({top: 0, behavior: 'smooth'}); };
 </script>
 </body>
