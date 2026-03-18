@@ -40,7 +40,6 @@
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
         
-        /* DURATION COLOR BADGES */
         .duration-badge { padding: 5px 12px; border-radius: 50px; color: white; font-weight: bold; font-size: 0.8rem; }
         .dur-safe { background: var(--green-guard); }
         .dur-warning { background: var(--warning-orange); }
@@ -60,24 +59,10 @@
         .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
         .kiosk-input { font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); text-align: center; font-weight: bold; margin-bottom: 20px; }
 
-        /* FLOATING SCROLL BUTTON */
         #scrollToTopBtn {
-            display: none;
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 99;
-            border: none;
-            outline: none;
-            background-color: var(--red-main);
-            color: white;
-            cursor: pointer;
-            padding: 15px;
-            border-radius: 50%;
-            font-size: 20px;
-            width: 55px;
-            height: 55px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            display: none; position: fixed; bottom: 30px; right: 30px; z-index: 99; border: none; outline: none;
+            background-color: var(--red-main); color: white; cursor: pointer; padding: 15px; border-radius: 50%;
+            font-size: 20px; width: 55px; height: 55px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         #scrollToTopBtn:hover { background-color: var(--red-dark); transform: scale(1.15); }
@@ -86,14 +71,8 @@
             body * { visibility: hidden; } 
             #print-area, #print-area * { visibility: visible; } 
             #print-area { 
-                position: absolute; 
-                top: 0; 
-                left: 0; 
-                width: 48mm; 
-                padding: 2mm;
-                font-family: 'Courier New', Courier, monospace;
-                color: black;
-                background: white;
+                position: absolute; top: 0; left: 0; width: 48mm; padding: 2mm;
+                font-family: 'Courier New', Courier, monospace; color: black; background: white;
             } 
             @page { size: 58mm auto; margin: 0; }
         }
@@ -106,14 +85,23 @@
         <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 80px; margin-bottom: 10px; border-radius: 50%;">
         <h1 style="color:var(--red-main); margin:0;">METRO PLAZA BAGONG SILANG</h1>
         <p style="margin-bottom:30px; color:#555; font-weight: bold;">SELECT ACCESS LEVEL</p>
-        <button onclick="enterGuard()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem; margin-bottom:15px;">🛡️ GUARD ACCESS</button>
+        <button onclick="showGuardLogin()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem; margin-bottom:15px;">🛡️ GUARD ACCESS</button>
         <button onclick="showAdminLogin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">🔑 ADMIN LOGIN</button>
+    </div>
+
+    <div class="glass-card" id="guard-login" style="display:none; border-top: 5px solid var(--green-guard);">
+        <h1 style="color:var(--green-guard); margin:0;">GUARD LOGIN</h1>
+        <p>Access Guard PIN</p>
+        <input type="password" id="guard-pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center; font-size: 1.5rem;">
+        <button onclick="loginGuard()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY GUARD</button>
+        <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
 
     <div class="glass-card" id="admin-login" style="display:none;">
         <h1 style="color:var(--red-main); margin:0;">ADMIN LOGIN</h1>
-        <input type="password" id="pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center;">
-        <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY</button>
+        <p>Enter Administrative PIN</p>
+        <input type="password" id="pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center; font-size: 1.5rem;">
+        <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY ADMIN</button>
         <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
 </div>
@@ -247,21 +235,15 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
-    // SCROLL TO TOP LOGIC
     const mybutton = document.getElementById("scrollToTopBtn");
     const mainContent = document.getElementById("main-content");
 
     mainContent.onscroll = function() {
-        if (mainContent.scrollTop > 300) {
-            mybutton.style.display = "block";
-        } else {
-            mybutton.style.display = "none";
-        }
+        if (mainContent.scrollTop > 300) { mybutton.style.display = "block"; } 
+        else { mybutton.style.display = "none"; }
     };
 
-    window.topFunction = () => {
-        mainContent.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    window.topFunction = () => { mainContent.scrollTo({ top: 0, behavior: 'smooth' }); };
 
     window.connectPrinter = async () => {
         try {
@@ -286,42 +268,44 @@
     };
 
     const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = 
-`      METRO PLAZA
-     BAGONG SILANG
- Phs2, Langit Rd, Caloocan
-        Metro Manila
---------------------------------
-          ENTRY TICKET
---------------------------------
-PLATE:    ${plate}
-DATE:     ${date}
-TIME IN:  ${entryTime}
-`;
+        const receiptStr = `      METRO PLAZA\n     BAGONG SILANG\n Phs2, Langit Rd, Caloocan\n        Metro Manila\n--------------------------------\n          ENTRY TICKET\n--------------------------------\nPLATE:    ${plate}\nDATE:     ${date}\nTIME IN:  ${entryTime}\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
-            document.getElementById('print-area').innerHTML = `
-                <div style="text-align:center; font-size: 11px; line-height: 1.2;">
-                    <strong style="font-size: 13px;">METRO PLAZA</strong><br>
-                    <strong>BAGONG SILANG</strong><br>
-                    Phs2, Langit Rd, Caloocan<br>
-                    Metro Manila<br>
-                    ----------------------------<br>
-                    <div style="text-align:left; margin-left: 5px;">
-                        <strong>PLATE: ${plate}</strong><br>
-                        DATE:  ${date}<br>
-                        TIME:  ${entryTime}<br>
-                    </div>
-                    ----------------------------<br>
-                </div>`;
+            document.getElementById('print-area').innerHTML = `<div style="text-align:center; font-size: 11px; line-height: 1.2;"><strong style="font-size: 13px;">METRO PLAZA</strong><br><strong>BAGONG SILANG</strong><br>Phs2, Langit Rd, Caloocan<br>Metro Manila<br>----------------------------<br><div style="text-align:left; margin-left: 5px;"><strong>PLATE: ${plate}</strong><br>DATE:  ${date}<br>TIME:  ${entryTime}<br></div>----------------------------<br></div>`;
             window.print();
         }
     };
 
-    window.enterGuard = () => { currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE"); };
-    window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
-    window.loginAdmin = () => { if(document.getElementById('pass').value === "0526") { currentUserRole = "admin"; loginSuccess("🔑 ADMIN MODE"); } else { alert("Access Denied"); } };
-    window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; };
+    // --- NEW LOGIN SYSTEM ---
+    window.showGuardLogin = () => {
+        document.getElementById('role-selection').style.display = 'none';
+        document.getElementById('guard-login').style.display = 'block';
+    };
+
+    window.showAdminLogin = () => {
+        document.getElementById('role-selection').style.display = 'none';
+        document.getElementById('admin-login').style.display = 'block';
+    };
+
+    window.backToSelection = () => {
+        document.getElementById('role-selection').style.display = 'block';
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('guard-login').style.display = 'none';
+        document.getElementById('pass').value = "";
+        document.getElementById('guard-pass').value = "";
+    };
+
+    window.loginGuard = () => {
+        if(document.getElementById('guard-pass').value === "12345") {
+            currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE");
+        } else { alert("Invalid Guard PIN"); }
+    };
+
+    window.loginAdmin = () => {
+        if(document.getElementById('pass').value === "0526") {
+            currentUserRole = "admin"; loginSuccess("🔑 ADMIN MODE");
+        } else { alert("Admin Access Denied"); }
+    };
 
     function loginSuccess(tag) {
         document.getElementById('user-role-tag').innerText = tag;
@@ -330,10 +314,10 @@ TIME IN:  ${entryTime}
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('sidebar').style.display = 'flex';
         document.getElementById('main-content').style.display = 'block';
-        renderHistory();
-        renderSales();
+        renderHistory(); renderSales();
     }
 
+    // --- CORE LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
@@ -355,40 +339,12 @@ TIME IN:  ${entryTime}
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
 
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
-        const salesRef = await addDoc(collection(db, "sales_report"), { 
-            plate, pay: payment, date: data.date, timestamp: Date.now() 
-        });
-        
+        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
-        const receiptStr = `
-METRO PLAZA
-Bagong Silang Branch
--------------------------
-REF NO:    ${refNo}
-PLATE:     ${plate}
-DATE:      ${new Date().toLocaleDateString()}
-TIME IN:   ${data.entryTime}
-TIME OUT:  ${outTime}
-DURATION:  ${hrs} hr(s)
--------------------------
-TOTAL FEE: P${payment}.00
--------------------------
-`;
+        const receiptStr = `\nMETRO PLAZA\nBagong Silang Branch\n-------------------------\nREF NO:    ${refNo}\nPLATE:     ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:   ${data.entryTime}\nTIME OUT:  ${outTime}\nDURATION:  ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
-            document.getElementById('print-area').innerHTML = `
-                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
-                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
-                    <div style="text-align:left;">
-                        <b>REF NO: ${refNo}</b><br>
-                        PLATE: ${plate}<br>
-                        DATE: ${new Date().toLocaleDateString()}<br>
-                        TIME IN: ${data.entryTime}<br>
-                        TIME OUT: ${outTime}<br>
-                        DURATION: ${hrs} hr(s)
-                    </div>
-                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p>
-                </div>`;
+            document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;"><h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr><div style="text-align:left;"><b>REF NO: ${refNo}</b><br>PLATE: ${plate}<br>DATE: ${new Date().toLocaleDateString()}<br>TIME IN: ${data.entryTime}<br>TIME OUT: ${outTime}<br>DURATION: ${hrs} hr(s)</div><hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p></div>`;
             window.print();
         }
         await deleteDoc(doc(db, "active_parking", plate));
@@ -432,8 +388,7 @@ TOTAL FEE: P${payment}.00
     window.restoreFromArchive = async (id) => {
         const docSnap = await getDoc(doc(db, "archive", id));
         if (docSnap.exists()) {
-            const data = docSnap.data();
-            const col = data.originalCol;
+            const data = docSnap.data(); const col = data.originalCol;
             delete data.originalCol; delete data.deletedAt;
             await addDoc(collection(db, col), data);
             await deleteDoc(doc(db, "archive", id));
