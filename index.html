@@ -120,7 +120,7 @@
             body * { visibility: hidden; } 
             #print-area, #print-area * { visibility: visible; } 
             #print-area { 
-                position: absolute; top: 0; left: 0; width: 48mm; padding: 2mm;
+                position: absolute; top: 0; left: 0; width: 48mm; padding: 1mm;
                 font-family: 'Courier New', Courier, monospace; color: black; background: white;
             } 
             @page { size: 58mm auto; margin: 0; }
@@ -325,16 +325,68 @@
     };
     syncCreds();
 
-    // --- KIOSK LOGIC (RESTORED) ---
+    // --- PRINTER UTILS ---
+    window.connectPrinter = async () => {
+        try {
+            const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const characteristics = await service.getCharacteristics();
+            printerCharacteristic = characteristics.find(c => c.properties.write);
+            document.getElementById('bt-status').innerText = "✅ PRINTER CONNECTED";
+            document.getElementById('bt-status').style.background = "#2e7d32";
+        } catch (e) { alert("Bluetooth Error: " + e.message); }
+    };
+
+    const printReceipt = async (text) => {
+        if (!printerCharacteristic) return false;
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
+            await printerCharacteristic.writeValue(data);
+            return true;
+        } catch (e) { return false; }
+    };
+
+    // --- ENTRY TICKET LOGIC ---
+    const printEntryTicket = async (plate, entryTime, date) => {
+        const receiptStr = 
+`\x1B\x61\x01      METRO PLAZA
+  BAGONG SILANG BRANCH
+        Metro Manila
+\x1B\x61\x00--------------------------------
+\x1B\x61\x01         ENTRY TICKET
+\x1B\x61\x00--------------------------------
+PLATE:    ${plate}
+DATE:     ${date}
+TIME IN:  ${entryTime}
+\n\n\n`;
+
+        const printed = await printReceipt(receiptStr);
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="text-align:center; font-size: 11px; font-family: monospace; width: 48mm; padding: 10px; background: white;">
+                    <strong>METRO PLAZA</strong><br>
+                    <strong>BAGONG SILANG BRANCH</strong><br>
+                    ----------------------------<br>
+                    <strong>ENTRY TICKET</strong><br>
+                    ----------------------------<br>
+                    <div style="text-align:left;">
+                        PLATE: ${plate}<br>
+                        DATE:  ${date}<br>
+                        TIME:  ${entryTime}
+                    </div>
+                    ----------------------------<br>
+                </div>`;
+            window.print();
+        }
+    };
+
     window.kioskCheckIn = async () => {
         const plateInput = document.getElementById('kioskPlate');
         const plate = plateInput.value.toUpperCase().trim();
         const feedback = document.getElementById('kiosk-feedback');
-        
-        if(!plate) {
-            alert("Please enter Plate Number");
-            return;
-        }
+        if(!plate) { alert("Please enter Plate Number"); return; }
 
         const entryData = {
             plate: plate,
@@ -348,9 +400,7 @@
             feedback.innerText = "✅ CHECKED-IN: " + plate;
             feedback.style.color = "#4caf50";
             plateInput.value = "";
-
-            const receipt = `\nMETRO PLAZA\nENTRY TICKET\n----------------\nPLATE: ${plate}\nIN:    ${entryData.entryTime}\nDATE:  ${entryData.date}\n----------------\n`;
-            await printReceipt(receipt);
+            await printEntryTicket(plate, entryData.entryTime, entryData.date);
             setTimeout(() => { feedback.innerText = ""; }, 3000);
         } catch (e) { alert("Kiosk Error: " + e.message); }
     };
@@ -358,7 +408,59 @@
     window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; };
     window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
 
-    // --- SECURITY ACTIONS ---
+    // --- CHECKOUT LOGIC & RELEASE RECEIPT ---
+    function calculatePayment(msIn) {
+        const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
+        const totalHrs = Math.max(1, hrsElapsed);
+        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
+    }
+
+    window.checkOut = async (plate) => {
+        const data = activeParkingCache.find(d => d.plate === plate);
+        if(!data) return;
+        const outTime = new Date().toLocaleTimeString();
+        const payment = calculatePayment(data.rawIn);
+        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
+
+        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
+        const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
+        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
+
+        const receiptStr = `
+METRO PLAZA
+Bagong Silang Branch
+-------------------------
+REF NO:    ${refNo}
+PLATE:     ${plate}
+DATE:      ${new Date().toLocaleDateString()}
+TIME IN:   ${data.entryTime}
+TIME OUT:  ${outTime}
+DURATION:  ${hrs} hr(s)
+-------------------------
+TOTAL FEE: P${payment}.00
+-------------------------
+`;
+        const printed = await printReceipt(receiptStr);
+        if (!printed) {
+            document.getElementById('print-area').innerHTML = `
+                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
+                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
+                    <div style="text-align:left;">
+                        <b>REF NO: ${refNo}</b><br>
+                        PLATE: ${plate}<br>
+                        DATE: ${new Date().toLocaleDateString()}<br>
+                        TIME IN: ${data.entryTime}<br>
+                        TIME OUT: ${outTime}<br>
+                        DURATION: ${hrs} hr(s)
+                    </div>
+                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p>Thank you!</p>
+                </div>`;
+            window.print();
+        }
+        await deleteDoc(doc(db, "active_parking", plate));
+    };
+
+    // --- SECURITY & UI HELPERS ---
     window.updatePIN = async (type) => {
         const inputId = type === 'guard' ? 'new-guard-pin' : 'new-admin-pin';
         const pinVal = document.getElementById(inputId).value.trim();
@@ -377,7 +479,6 @@
         setTimeout(() => fb.innerText = "", 3000);
     }
 
-    // --- LOGIN LOGIC ---
     window.loginGuard = () => {
         if(document.getElementById('guard-pass').value === sysCreds.guardPIN) {
             currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE");
@@ -402,55 +503,6 @@
         document.getElementById('main-content').style.display = 'block';
     }
 
-    // --- PRINTER & LOGIC ---
-    window.connectPrinter = async () => {
-        try {
-            const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-            const characteristics = await service.getCharacteristics();
-            printerCharacteristic = characteristics.find(c => c.properties.write);
-            document.getElementById('bt-status').innerText = "✅ PRINTER CONNECTED";
-            document.getElementById('bt-status').style.background = "#2e7d32";
-        } catch (e) { alert("Bluetooth Error: " + e.message); }
-    };
-
-    const printReceipt = async (text) => {
-        if (!printerCharacteristic) return false;
-        try {
-            const encoder = new TextEncoder();
-            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
-            await printerCharacteristic.writeValue(data);
-            return true;
-        } catch (e) { return false; }
-    };
-
-    function calculatePayment(msIn) {
-        const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
-        const totalHrs = Math.max(1, hrsElapsed);
-        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
-    }
-
-    window.checkOut = async (plate) => {
-        const data = activeParkingCache.find(d => d.plate === plate);
-        if(!data) return;
-        const outTime = new Date().toLocaleTimeString();
-        const payment = calculatePayment(data.rawIn);
-        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
-
-        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
-        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
-        const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
-        const receiptStr = `\nMETRO PLAZA\nBagong Silang Branch\n-------------------------\nREF NO:    ${refNo}\nPLATE:     ${plate}\nDATE:      ${new Date().toLocaleDateString()}\nTIME IN:   ${data.entryTime}\nTIME OUT:  ${outTime}\nDURATION:  ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\n`;
-        const printed = await printReceipt(receiptStr);
-        if (!printed) {
-            document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:300px; padding:10px; background:white; border: 1px solid black;"><h3>METRO PLAZA</h3><hr><div style="text-align:left;">REF: ${refNo}<br>PLATE: ${plate}<br>FEE: P${payment}.00</div></div>`;
-            window.print();
-        }
-        await deleteDoc(doc(db, "active_parking", plate));
-    };
-
-    // --- UI HELPERS ---
     window.togglePassword = (id, btn) => {
         const input = document.getElementById(id);
         input.type = input.type === "password" ? "text" : "password";
@@ -469,7 +521,7 @@
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; document.getElementById('guard-login').style.display = 'none'; };
 
-    // --- DATA HANDLING ---
+    // --- DATA SNAPSHOTS ---
     onSnapshot(collection(db, "active_parking"), snap => {
         activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
         let normalHTML = "", overtimeHTML = "";
