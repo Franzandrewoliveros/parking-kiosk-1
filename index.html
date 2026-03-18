@@ -391,15 +391,42 @@
         const payment = calculatePayment(data.rawIn);
         const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
         const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
-        const refNo = salesRef.id.substring(0, 8).toUpperCase();
-        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
+         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
 
-        const receiptStr = `METRO PLAZA\nBagong Silang Branch\n-------------------------\nREF NO: ${refNo}\nPLATE: ${plate}\nDATE: ${new Date().toLocaleDateString()}\nTIME IN: ${data.entryTime}\nTIME OUT: ${outTime}\nDURATION: ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------`;
+        const receiptStr = `
+METRO PLAZA
+Bagong Silang Branch
+-------------------------
+REF NO:    ${refNo}
+PLATE:     ${plate}
+DATE:      ${new Date().toLocaleDateString()}
+TIME IN:   ${data.entryTime}
+TIME OUT:  ${outTime}
+DURATION:  ${hrs} hr(s)
+-------------------------
+TOTAL FEE: P${payment}.00
+-------------------------
+`;
+        
         const printed = await printReceipt(receiptStr);
+        
         if (!printed) {
-            document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;"><h3>METRO PLAZA</h3><hr><div style="text-align:left;"><b>REF NO: ${refNo}</b><br>PLATE: ${plate}<br>DATE: ${new Date().toLocaleDateString()}<br>TIME IN: ${data.entryTime}<br>TIME OUT: ${outTime}<br>DURATION: ${hrs} hr(s)</div><hr><h2>TOTAL: P${payment}.00</h2><hr></div>`;
+            document.getElementById('print-area').innerHTML = `
+                <div style="font-family:monospace; text-align:center; width:300px; border:1px solid #000; padding:10px; background:white;">
+                    <h3>METRO PLAZA</h3><p>Bagong Silang Branch</p><hr>
+                    <div style="text-align:left;">
+                        <b>REF NO: ${refNo}</b><br>
+                        PLATE: ${plate}<br>
+                        DATE: ${new Date().toLocaleDateString()}<br>
+                        TIME IN: ${data.entryTime}<br>
+                        TIME OUT: ${outTime}<br>
+                        DURATION: ${hrs} hr(s)
+                    </div>
+                    <hr><h2>TOTAL: P${payment}.00</h2><hr><p></p>
+                </div>`;
             window.print();
         }
+
         await deleteDoc(doc(db, "active_parking", plate));
     };
 
