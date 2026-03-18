@@ -220,8 +220,8 @@
 
     <div id="hist" class="tab-view" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
-            <input type="date" class="search-box" onchange="filterByDate('table-hist', this.value)" style="width: 160px;">
+            <input type="text" id="search-hist" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
+            <input type="date" id="date-hist" class="search-box" onchange="filterByDate('table-hist', this.value)" style="width: 160px;">
             <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ ARCHIVE ALL</button>
         </div>
         <div class="table-container">
@@ -234,8 +234,8 @@
 
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
+            <input type="text" id="search-sale" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
+            <input type="date" id="date-sale" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
             <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
         <div class="table-container">
@@ -408,11 +408,11 @@ TIME IN:  ${entryTime}
     window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; };
     window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
 
-    // --- CHECKOUT LOGIC & RELEASE RECEIPT ---
+    // --- CHECKOUT LOGIC ---
     function calculatePayment(msIn) {
         const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
         const totalHrs = Math.max(1, hrsElapsed);
-        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
+        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 5 : 20;
     }
 
     window.checkOut = async (plate) => {
@@ -521,7 +521,76 @@ TOTAL FEE: P${payment}.00
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; document.getElementById('guard-login').style.display = 'none'; };
 
-    // --- DATA SNAPSHOTS ---
+    // --- SEARCH & FILTER LOGIC ---
+    window.filterTable = (tableId, query) => {
+        const rows = document.getElementById(tableId).getElementsByTagName('tr');
+        for (let row of rows) {
+            row.style.display = row.innerText.toUpperCase().includes(query.toUpperCase()) ? "" : "none";
+        }
+    };
+
+    window.filterByDate = (tableId, dateVal) => {
+        if(!dateVal) return;
+        const formatted = new Date(dateVal).toLocaleDateString();
+        const rows = document.getElementById(tableId).getElementsByTagName('tr');
+        for (let row of rows) {
+            row.style.display = row.innerText.includes(formatted) ? "" : "none";
+        }
+    };
+
+    // --- ARCHIVE UTILS ---
+    window.moveToArchive = async (colName, id) => {
+        if(!confirm("Move this record to Recycle Bin?")) return;
+        try {
+            const docRef = doc(db, colName, id);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                await addDoc(collection(db, "archive"), { ...snap.data(), originalCol: colName, deletedAt: Date.now() });
+                await deleteDoc(docRef);
+            }
+        } catch (e) { alert(e.message); }
+    };
+
+    window.restoreFromArchive = async (id) => {
+        try {
+            const docRef = doc(db, "archive", id);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                const data = snap.data();
+                const targetCol = data.originalCol;
+                const restoredData = { ...data };
+                delete restoredData.originalCol;
+                delete restoredData.deletedAt;
+                await addDoc(collection(db, targetCol), restoredData);
+                await deleteDoc(docRef);
+            }
+        } catch (e) { alert(e.message); }
+    };
+
+    window.deleteForever = async (id) => {
+        if(confirm("Permanently delete this record?")) await deleteDoc(doc(db, "archive", id));
+    };
+
+    window.clearCollection = async (name) => {
+        if(!confirm("Are you sure? This cannot be undone.")) return;
+        const snap = await getDocs(collection(db, name));
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+    };
+
+    window.archiveEntireCollection = async (colName) => {
+        if(!confirm("Move all visible records to archive?")) return;
+        const snap = await getDocs(collection(db, colName));
+        const batch = writeBatch(db);
+        for(let d of snap.docs) {
+            await addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: Date.now() });
+            batch.delete(d.ref);
+        }
+        await batch.commit();
+    };
+
+    // --- SNAPSHOT LISTENERS ---
     onSnapshot(collection(db, "active_parking"), snap => {
         activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
         let normalHTML = "", overtimeHTML = "";
@@ -537,17 +606,36 @@ TOTAL FEE: P${payment}.00
         document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center">No overtime vehicles</td></tr>';
     });
 
+    onSnapshot(collection(db, "parking_history"), snap => {
+        document.getElementById('table-hist').innerHTML = snap.docs.map(d => {
+            const r = d.data();
+            const actionHTML = (currentUserRole === "admin") 
+                ? `<button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️ ARCHIVE</button>` 
+                : `<span style="color:#999; font-size:0.8rem;">View Only</span>`;
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td>${actionHTML}</td></tr>`;
+        }).join('');
+    });
+
     onSnapshot(collection(db, "sales_report"), snap => {
-        let g = 0, t = 0; const today = new Date().toLocaleDateString();
+        let todayTotal = 0; let grandTotal = 0; const todayDate = new Date().toLocaleDateString();
         document.getElementById('table-sale').innerHTML = snap.docs.map(d => {
-            const r = d.data(); g += Number(r.pay); if(r.date === today) t += Number(r.pay);
-            return `<tr><td>#${d.id.substring(0,8).toUpperCase()}</td><td>${r.plate}</td><td>P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td></tr>`;
-        }).reverse().join('');
-        document.getElementById('grand-total').innerText = "P" + g.toFixed(2);
-        document.getElementById('today-total').innerText = "P" + t.toFixed(2);
+            const r = d.data(); grandTotal += r.pay; if(r.date === todayDate) todayTotal += r.pay;
+            return `<tr><td>${d.id.substring(0, 8).toUpperCase()}</td><td><b>${r.plate}</b></td><td>P${r.pay}.00</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td></tr>`;
+        }).join('');
+        document.getElementById('today-total').innerText = "P" + todayTotal.toLocaleString() + ".00";
+        document.getElementById('grand-total').innerText = "P" + grandTotal.toLocaleString() + ".00";
+    });
+
+    onSnapshot(collection(db, "archive"), snap => {
+        document.getElementById('table-arch').innerHTML = snap.docs.map(d => {
+            const r = d.data();
+            return `<tr><td><b>${r.plate}</b></td><td>${(r.originalCol || '').replace('_', ' ').toUpperCase()}</td><td>${new Date(r.deletedAt).toLocaleString()}</td><td><button class="btn-restore" onclick="restoreFromArchive('${d.id}')">↺ RESTORE</button><button class="btn-delete" onclick="deleteForever('${d.id}')">❌</button></td></tr>`;
+        }).join('');
     });
 
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+
+    window.topFunction = () => { document.getElementById('main-content').scrollTo({top: 0, behavior: 'smooth'}); };
 </script>
 </body>
 </html>
