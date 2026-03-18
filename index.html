@@ -14,7 +14,6 @@
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
-        /* --- NEW ANIMATIONS --- */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -202,7 +201,7 @@
 
     <div id="sale" class="tab-view admin-only" style="display:none">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
+            <input type="text" class="search-box" placeholder="Search Plate or Ref..." onkeyup="filterTable('table-sale', this.value)">
             <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
             <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
         </div>
@@ -282,7 +281,6 @@
         }
     });
 
-    // --- PRINTER ---
     window.connectPrinter = async () => {
         try {
             const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
@@ -305,7 +303,6 @@
         } catch (e) { return false; }
     };
 
-    // --- FUNCTIONS ---
     window.togglePass = (id) => {
         const x = document.getElementById(id);
         x.type = x.type === "password" ? "text" : "password";
@@ -334,7 +331,6 @@
         alert("PIN Updated Successfully");
     };
 
-    // --- CORE LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / 3600000);
         const mins = Math.floor((ms % 3600000) / 60000);
@@ -390,7 +386,6 @@
         setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 3000);
     };
 
-    // --- ARCHIVE LOGIC ---
     window.moveToArchive = async (sourceCol, id) => {
         const docSnap = await getDoc(doc(db, sourceCol, id));
         if (docSnap.exists()) {
@@ -410,20 +405,56 @@
         await batch.commit();
     };
 
+    // --- SEARCH & FILTER LOGIC ---
+    window.filterTable = (tableId, query) => {
+        const q = query.toUpperCase();
+        const rows = document.querySelectorAll(`#${tableId} tr`);
+        rows.forEach(row => {
+            const text = row.innerText.toUpperCase();
+            row.style.display = text.includes(q) ? "" : "none";
+        });
+    };
+
+    window.filterByDate = (tableId, dateVal) => {
+        if(!dateVal) return;
+        const selectedDate = new Date(dateVal).toLocaleDateString();
+        const rows = document.querySelectorAll(`#${tableId} tr`);
+        rows.forEach(row => {
+            const dateCell = row.innerText; 
+            row.style.display = dateCell.includes(selectedDate) ? "" : "none";
+        });
+    };
+
     onSnapshot(collection(db, "parking_history"), snap => {
         document.getElementById('table-hist').innerHTML = snap.docs.map(d => {
             const r = d.data();
-            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">Delete</button></td></tr>`;
+            return `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">Delete</button></td></tr>`;
         }).reverse().join('');
     });
 
     onSnapshot(collection(db, "sales_report"), snap => {
         let total = 0;
+        let todayTotal = 0;
+        const todayStr = new Date().toLocaleDateString();
+
         document.getElementById('table-sale').innerHTML = snap.docs.map(d => {
-            const r = d.data(); total += Number(r.pay);
-            return `<tr><td>${d.id.substring(0,6)}</td><td>${r.plate}</td><td>P${r.pay}</td><td>${r.date}</td><td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">Delete</button></td></tr>`;
+            const r = d.data(); 
+            const val = Number(r.pay);
+            total += val;
+            if(r.date === todayStr) todayTotal += val;
+
+            const refNo = d.id.substring(0, 8).toUpperCase();
+            return `<tr>
+                <td style="font-family: monospace; color: #666;">#${refNo}</td>
+                <td><b>${r.plate}</b></td>
+                <td>P${val.toFixed(2)}</td>
+                <td>${r.date}</td>
+                <td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">Delete</button></td>
+            </tr>`;
         }).reverse().join('');
+        
         document.getElementById('grand-total').innerText = "P" + total.toFixed(2);
+        document.getElementById('today-total').innerText = "P" + todayTotal.toFixed(2);
     });
 
     onSnapshot(collection(db, "archive"), snap => {
@@ -456,7 +487,7 @@
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
-        document.getElementById('view-title').innerText = el.innerText;
+        document.getElementById('view-title').innerText = el.innerText.replace('🔴 ', '').replace('📂 ', '').replace('💰 ', '').replace('♻️ ', '').replace('⚙️ ', '');
     };
     setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
 </script>
