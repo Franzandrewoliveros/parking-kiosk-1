@@ -13,6 +13,57 @@
         
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
+        /* --- ANIMATION ENGINE --- */
+        /* Smooth Fade for Tabs and Cards */
+        .tab-view, .glass-card, #kiosk-view > div {
+            animation: smoothFade 0.5s ease-in-out;
+        }
+
+        @keyframes smoothFade {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        button { transition: all 0.2s ease; cursor: pointer; }
+        button:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+
+        .nav-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        tbody tr { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .kiosk-input:focus {
+            outline: none;
+            box-shadow: 0 0 30px var(--red-main);
+            transform: scale(1.02);
+            transition: 0.3s;
+        }
+
+        .dur-danger { animation: pulseRed 2s infinite; }
+        @keyframes pulseRed {
+            0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+        }
+
+        .pass-container { position: relative; width: 100%; margin-bottom: 20px; }
+        .toggle-pass { 
+            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer;
+            padding: 5px; transition: color 0.3s;
+        }
+        .toggle-pass:hover { color: var(--red-main); transform: translateY(-50%) scale(1.1); }
+        input[type="password"], input[type="text"].pass-input {
+            width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #ddd; 
+            text-align: center; font-size: 1.5rem; box-sizing: border-box; transition: all 0.3s;
+        }
+        input:focus { border-color: var(--red-main); box-shadow: 0 0 10px rgba(211, 47, 47, 0.1); }
+        /* --- END ANIMATION ENGINE --- */
+
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
@@ -29,7 +80,7 @@
 
         #sidebar { width: 280px; background: var(--dark-bg); color: white; display: none; flex-direction: column; z-index: 10; }
         .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
-        .nav-item { padding: 18px 25px; cursor: pointer; transition: 0.3s; border-bottom: 1px solid #2a2a2a; color: #aaa; }
+        .nav-item { padding: 18px 25px; cursor: pointer; border-bottom: 1px solid #2a2a2a; color: #aaa; }
         .nav-item:hover, .nav-item.active { background: #2a2a2a; color: white; border-left: 5px solid var(--red-main); }
 
         #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; scroll-behavior: smooth; }
@@ -92,7 +143,10 @@
     <div class="glass-card" id="guard-login" style="display:none; border-top: 5px solid var(--green-guard);">
         <h1 style="color:var(--green-guard); margin:0;">GUARD LOGIN</h1>
         <p>Access Guard PIN</p>
-        <input type="password" id="guard-pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center; font-size: 1.5rem;">
+        <div class="pass-container">
+            <input type="password" id="guard-pass" class="pass-input" placeholder="PIN">
+            <button class="toggle-pass" onclick="togglePassword('guard-pass', this)">👁️</button>
+        </div>
         <button onclick="loginGuard()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY GUARD</button>
         <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
@@ -100,7 +154,10 @@
     <div class="glass-card" id="admin-login" style="display:none;">
         <h1 style="color:var(--red-main); margin:0;">ADMIN LOGIN</h1>
         <p>Enter Administrative PIN</p>
-        <input type="password" id="pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px; text-align: center; font-size: 1.5rem;">
+        <div class="pass-container">
+            <input type="password" id="pass" class="pass-input" placeholder="PIN">
+            <button class="toggle-pass" onclick="togglePassword('pass', this)">👁️</button>
+        </div>
         <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY ADMIN</button>
         <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
@@ -235,6 +292,17 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
 
+    window.togglePassword = (id, btn) => {
+        const input = document.getElementById(id);
+        if (input.type === "password") {
+            input.type = "text";
+            btn.innerText = "🔒";
+        } else {
+            input.type = "password";
+            btn.innerText = "👁️";
+        }
+    };
+
     const mybutton = document.getElementById("scrollToTopBtn");
     const mainContent = document.getElementById("main-content");
 
@@ -268,7 +336,7 @@
     };
 
     const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = `      METRO PLAZA\n     BAGONG SILANG\n Phs2, Langit Rd, Caloocan\n        Metro Manila\n--------------------------------\n          ENTRY TICKET\n--------------------------------\nPLATE:    ${plate}\nDATE:     ${date}\nTIME IN:  ${entryTime}\n`;
+        const receiptStr = `      METRO PLAZA\n     BAGONG SILANG\n Phs2, Langit Rd, Caloocan\n       Metro Manila\n--------------------------------\n         ENTRY TICKET\n--------------------------------\nPLATE:    ${plate}\nDATE:     ${date}\nTIME IN:  ${entryTime}\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `<div style="text-align:center; font-size: 11px; line-height: 1.2;"><strong style="font-size: 13px;">METRO PLAZA</strong><br><strong>BAGONG SILANG</strong><br>Phs2, Langit Rd, Caloocan<br>Metro Manila<br>----------------------------<br><div style="text-align:left; margin-left: 5px;"><strong>PLATE: ${plate}</strong><br>DATE:  ${date}<br>TIME:  ${entryTime}<br></div>----------------------------<br></div>`;
@@ -276,7 +344,6 @@
         }
     };
 
-    // --- NEW LOGIN SYSTEM ---
     window.showGuardLogin = () => {
         document.getElementById('role-selection').style.display = 'none';
         document.getElementById('guard-login').style.display = 'block';
@@ -317,7 +384,6 @@
         renderHistory(); renderSales();
     }
 
-    // --- CORE LOGIC ---
     function formatDuration(ms) {
         const hrs = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
