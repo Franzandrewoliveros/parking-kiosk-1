@@ -309,7 +309,7 @@
     let sysCreds = { 
         guardPIN: "12345", 
         adminPIN: "0526", 
-        recoveryKey: "METRO-PLAZA-2026-RECOVERY" 
+        recoveryKey: "METRO2026" 
     };
 
     const syncCreds = async () => {
@@ -324,6 +324,39 @@
         }
     };
     syncCreds();
+
+    // --- KIOSK LOGIC (RESTORED) ---
+    window.kioskCheckIn = async () => {
+        const plateInput = document.getElementById('kioskPlate');
+        const plate = plateInput.value.toUpperCase().trim();
+        const feedback = document.getElementById('kiosk-feedback');
+        
+        if(!plate) {
+            alert("Please enter Plate Number");
+            return;
+        }
+
+        const entryData = {
+            plate: plate,
+            entryTime: new Date().toLocaleTimeString(),
+            rawIn: Date.now(),
+            date: new Date().toLocaleDateString()
+        };
+
+        try {
+            await setDoc(doc(db, "active_parking", plate), entryData);
+            feedback.innerText = "✅ CHECKED-IN: " + plate;
+            feedback.style.color = "#4caf50";
+            plateInput.value = "";
+
+            const receipt = `\nMETRO PLAZA\nENTRY TICKET\n----------------\nPLATE: ${plate}\nIN:    ${entryData.entryTime}\nDATE:  ${entryData.date}\n----------------\n`;
+            await printReceipt(receipt);
+            setTimeout(() => { feedback.innerText = ""; }, 3000);
+        } catch (e) { alert("Kiosk Error: " + e.message); }
+    };
+
+    window.enterKiosk = () => { document.getElementById('kiosk-view').style.display = 'flex'; };
+    window.exitKiosk = () => { document.getElementById('kiosk-view').style.display = 'none'; };
 
     // --- SECURITY ACTIONS ---
     window.updatePIN = async (type) => {
@@ -353,10 +386,10 @@
 
     window.loginAdmin = () => {
         const input = document.getElementById('pass').value;
-        if(input === sysCreds.adminPIN || input === sysCreds.recoveryKey) {
+        if(input === sysCreds.adminPIN || input === "METRO2026") {
             currentUserRole = "admin"; 
-            loginSuccess("🔑 ADMIN MODE" + (input === sysCreds.recoveryKey ? " (RECOVERY)" : ""));
-            if(input === sysCreds.recoveryKey) alert("Master Recovery Key Used.");
+            loginSuccess("🔑 ADMIN MODE" + (input === "METRO2026" ? " (RECOVERY)" : ""));
+            if(input === "METRO2026") alert("Master Recovery Key Used.");
         } else { alert("Admin Access Denied"); }
     };
 
