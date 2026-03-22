@@ -413,21 +413,37 @@
         }
         await deleteDoc(doc(db, "active_parking", plate));
     };
+// --- UPDATED REAL-TIME SYNC FOR DASHBOARD (GUARD ACCESS ONLY) ---
+onSnapshot(collection(db, "active_parking"), snap => {
+    activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+    let normalHTML = "", overtimeHTML = "";
+    
+    activeParkingCache.forEach(r => {
+        const timeElapsed = Date.now() - r.rawIn;
+        const dur = formatDuration(timeElapsed);
+        const fee = calculatePayment(r.rawIn);
+        
+        // --- UPDATED LOGIC: GUARD GETS THE BUTTON, ADMIN IS VIEW ONLY ---
+        const actionCell = (currentUserRole === 'guard') 
+            ? `<button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button>` 
+            : `<span style="color:#888; font-size:0.8rem; font-weight:bold;">VIEW ONLY</span>`;
 
-    // --- REAL-TIME SYNC ---
-    onSnapshot(collection(db, "active_parking"), snap => {
-        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        let normalHTML = "", overtimeHTML = "";
-        activeParkingCache.forEach(r => {
-            const timeElapsed = Date.now() - r.rawIn;
-            const dur = formatDuration(timeElapsed);
-            const fee = calculatePayment(r.rawIn);
-            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td style="font-weight:bold; color:var(--red-main)">P${fee}.00</td><td><span style="color:${timeElapsed >= 14400000 ? 'red' : 'green'}">● ${timeElapsed >= 14400000 ? 'OVERTIME' : 'PARKED'}</span></td><td>${r.date}</td><td><button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button></td></tr>`;
-            if (timeElapsed >= 14400000) overtimeHTML += row; else normalHTML += row;
-        });
-        document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No active regular parking</td></tr>';
-        document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No overtime vehicles</td></tr>';
+        const row = `<tr>
+            <td><b>${r.plate}</b></td>
+            <td>${r.entryTime}</td>
+            <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
+            <td style="font-weight:bold; color:var(--red-main)">P${fee}.00</td>
+            <td><span style="color:${timeElapsed >= 14400000 ? 'red' : 'green'}">● ${timeElapsed >= 14400000 ? 'OVERTIME' : 'PARKED'}</span></td>
+            <td>${r.date}</td>
+            <td>${actionCell}</td>
+        </tr>`;
+        
+        if (timeElapsed >= 14400000) overtimeHTML += row; else normalHTML += row;
     });
+    
+    document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No active regular parking</td></tr>';
+    document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No overtime vehicles</td></tr>';
+});
 
     // --- ARCHIVE ENGINE ---
     window.moveToArchive = async (sourceCol, id) => {
