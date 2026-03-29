@@ -164,9 +164,9 @@
         <h2 style="margin:0;">METRO PLAZA BAGONG SILANG</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
-    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">📡 CONNECT PRINTER</div>
-    <div class="nav-item active" onclick="showTab('dash', this)">🔴 DASHBOARD</div>
-    <div class="nav-item" onclick="showTab('hist', this)">📂 HISTORY</div>
+    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">🖨️ CONNECT PRINTER</div>
+    <div class="nav-item active" onclick="showTab('dash', this)"> DASHBOARD</div>
+    <div class="nav-item" onclick="showTab('hist', this)"> 🕒 HISTORY</div>
     <div class="nav-item admin-only" onclick="showTab('sale', this)">💰 SALES REPORT</div>
     <div class="nav-item admin-only" onclick="showTab('arch', this)" style="background: #263238;">♻️ RECYCLE BIN</div>
     <div class="nav-item admin-only" onclick="showTab('settings', this)">⚙️ SETTINGS</div>
@@ -181,7 +181,7 @@
     </div>
 
     <div id="dash" class="tab-view">
-        <h3 style="color: var(--green-guard); margin-bottom: 10px;">🟢 ACTIVE PARKING (NORMAL)</h3>
+        <h3 style="color: var(--green-guard); margin-bottom: 10px;"> ACTIVE PARKING (NORMAL)</h3>
         <div class="table-container">
             <table>
                 <thead>
@@ -193,7 +193,7 @@
             </table>
         </div>
 
-        <h3 style="color: var(--red-main); margin-top: 30px; margin-bottom: 10px;">⚠️ OVERTIME PARKING (4H+)</h3>
+        <h3 style="color: var(--red-main); margin-top: 30px; margin-bottom: 10px;">⚠️ OVERTIME PARKING (4H above)</h3>
         <div class="table-container" style="border-top: 5px solid var(--red-main);">
             <table>
                 <thead>
@@ -210,7 +210,7 @@
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
             <input type="date" class="search-box" onchange="filterByDate('table-hist', this.value)" style="width: 160px;">
-            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗑️ ARCHIVE ALL</button>
+            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗄️ ARCHIVE ALL</button>
         </div>
         <div class="table-container">
             <table>
@@ -224,7 +224,7 @@
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
             <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
-            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">💸 ARCHIVE ALL</button>
+            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">🗄️ ARCHIVE ALL</button>
         </div>
         <div class="table-container">
             <table>
@@ -350,14 +350,14 @@
         const input = document.getElementById('guard-pass').value;
         const snap = await getDoc(doc(db, "settings", "credentials"));
         const storedPin = snap.exists() ? snap.data().guard : "321";
-        if(input === storedPin) { currentUserRole = "guard"; loginSuccess("🛡️ GUARD MODE"); } else { alert("Access Denied"); } 
+        if(input === storedPin) { currentUserRole = "guard"; loginSuccess(" GUARD "); } else { alert("Access Denied"); } 
     };
 
     window.loginAdmin = async () => { 
         const input = document.getElementById('pass').value;
         const snap = await getDoc(doc(db, "settings", "credentials"));
         const storedPin = snap.exists() ? snap.data().admin : "0526";
-        if(input === storedPin) { currentUserRole = "admin"; loginSuccess("🔑 ADMIN MODE"); } else { alert("Access Denied"); } 
+        if(input === storedPin) { currentUserRole = "admin"; loginSuccess(" ADMIN "); } else { alert("Access Denied"); } 
     };
 
     window.forgotPin = () => {
