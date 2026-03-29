@@ -57,7 +57,7 @@
         #sidebar { width: 280px; background: var(--dark-bg); color: white; display: none; flex-direction: column;
         z-index: 10; animation: slideIn 0.4s ease-out; }
         .sidebar-brand { padding: 40px 25px;
-        background: var(--red-main); text-align: center; }
+        background: var #2a2a2a; text-align: center; }
         .nav-item { padding: 18px 25px; cursor: pointer;
         transition: var(--transition); border-bottom: 1px solid #2a2a2a; color: #aaa; }
         .nav-item:hover { background: #2a2a2a;
@@ -166,28 +166,40 @@
         <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 80px; margin-bottom: 10px; border-radius: 50%;">
         <h1 style="color:var(--red-main); margin:0;">METRO PLAZA BAGONG SILANG</h1>
         <p style="margin-bottom:30px; color:#555; font-weight: bold;">SELECT ACCESS LEVEL</p>
-        <button onclick="showGuardLogin()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem; margin-bottom:15px;"> GUARD ACCESS</button>
+       <button onclick="showGuardLogin()" style="width:100%;padding:15px;background: #2a2a2a;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;font-size:1.1rem;margin-bottom:15px;"> GUARD ACCESS</button>
         <button onclick="showAdminLogin()" 
-        style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;"> ADMIN LOGIN</button>
+      <button onclick="showAdminLogin()" style="width:100%;padding:15px;background: #d32f2f;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;font-size:1.1rem;"> ADMIN LOGIN</button>
     </div>
 
     <div class="glass-card" id="guard-login" style="display:none;">
-        <h1 style="color:var(--green-guard);
-        margin:0;">GUARD LOGIN</h1>
+       <h1 style="
+        color: #2a2a2a;
+        margin:0;
+        ">GUARD LOGIN</h1>
         <div class="input-group">
             <input type="password" id="guard-pass" placeholder="GUARD PIN" style="width:100%;
         padding:15px; border-radius:10px; border:1px solid #ddd; text-align: center; box-sizing: border-box;">
             <span class="toggle-btn" onclick="togglePass('guard-pass', this)">SHOW</span>
         </div>
-        <button onclick="verifyGuard()" style="width:100%;
-        padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY</button>
+        <button onclick="verifyGuard()" style="
+        width:100%;
+        padding:15px;
+        background: #d32f2f;
+        color:white;
+        border:none;
+        border-radius:10px;
+        cursor:pointer;
+        font-weight:bold;
+        ">VERIFY</button>
         <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer;
         text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
 
     <div class="glass-card" id="admin-login" style="display:none;">
-        <h1 style="color:var(--red-main);
-        margin:0;">ADMIN LOGIN</h1>
+        <h1 style="
+        color: #2A2A2A;
+        margin:0;
+        ">ADMIN LOGIN</h1>
         <div class="input-group">
             <input type="password" id="pass" placeholder="PIN" style="width:100%;
         padding:15px; border-radius:10px; border:1px solid #ddd; text-align: center; box-sizing: border-box;">
@@ -227,7 +239,7 @@
         <h2 style="margin:0;">METRO PLAZA BAGONG SILANG</h2>
         <small id="user-role-tag">SYSTEM</small>
     </div>
-    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e;
+    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #2A2A2A;
     color: white;">🖨️ CONNECT PRINTER</div>
     <div class="nav-item active" onclick="showTab('dash', this)"> 📟DASHBOARD</div>
     <div class="nav-item" onclick="showTab('hist', this)"> 🕒 HISTORY</div>
