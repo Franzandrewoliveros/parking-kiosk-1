@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Metro Plaza Bagong Silang - Management System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
     <style>
         :root { 
             --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
@@ -12,47 +14,25 @@
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        /* Base Styles */
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #eee; height: 100vh; display: flex; overflow: hidden; }
 
-        /* Keyframe Animations */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        @keyframes bumper {
-            0% { transform: translateX(0); }
-            25% { transform: translateX(-3px) rotate(-1deg); }
-            50% { transform: translateX(3px) rotate(1deg); }
-            75% { transform: translateX(-3px) rotate(-1deg); }
-            100% { transform: translateX(0); }
-        }
-
+        
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
                         url('https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2000');
             background-size: cover; background-position: center;
             display: flex; justify-content: center; align-items: center;
-            transition: var(--transition);
         }
 
         .glass-card { 
             background: var(--glass); padding: 40px; border-radius: 20px; 
             width: 380px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-            border-top: 5px solid var(--red-main);
-            animation: fadeIn 0.5s ease-out;
+            border-top: 5px solid var(--red-main); animation: fadeIn 0.5s ease-out;
         }
 
-        /* Input & Password Toggle Styles */
-        .input-group { position: relative; width: 100%; margin-bottom: 20px; }
-        .toggle-btn {
-            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
-            background: none; border: none; color: #888; cursor: pointer;
-            font-size: 0.75rem; font-weight: bold; user-select: none;
-        }
-        .toggle-btn:hover { color: var(--red-main); }
-
-        /* Sidebar & Navigation */
         #sidebar { width: 280px; background: var(--dark-bg); color: white; display: none; flex-direction: column; z-index: 10; animation: slideIn 0.4s ease-out; }
         .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
         .nav-item { padding: 18px 25px; cursor: pointer; transition: var(--transition); border-bottom: 1px solid #2a2a2a; color: #aaa; }
@@ -61,493 +41,183 @@
 
         #main-content { flex-grow: 1; padding: 40px; overflow-y: auto; background: #f4f4f4; display: none; }
         .tab-view { animation: fadeIn 0.4s ease-in-out; }
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         
-        /* Tables */
         .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;}
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-        tr:hover { background-color: #fcfcfc; }
         
-        /* Buttons */
-        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: var(--transition); }
-        .btn-release:hover { transform: scale(1.05); filter: brightness(1.1); }
-        .btn-delete { background: #444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
-        .btn-restore { background: var(--green-guard); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-right: 5px; transition: var(--transition); }
-        .btn-restore:hover { transform: scale(1.05); }
-        .btn-clear { background: var(--red-dark); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-export { background: #2e7d32; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         
         .search-box { padding: 10px; border-radius: 8px; border: 1px solid #ddd; width: 180px; outline: none; }
-        .sales-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-        .total-bar { background: var(--dark-bg); color: white; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; }
+        .sales-summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .total-bar { background: var(--dark-bg); color: white; padding: 20px; border-radius: 10px; text-align: center; }
 
-        /* Kiosk Mode */
-        #kiosk-view { position: fixed; inset: 0; z-index: 2000; display: none; flex-direction: column; }
-        .kiosk-nav { background: var(--dark-bg); padding: 15px 30px; display: flex; justify-content: space-between; color: white; }
-        .kiosk-input { 
-            font-size: 5rem; width: 700px; padding: 20px; border-radius: 15px; border: 5px solid var(--red-main); 
-            text-align: center; font-weight: bold; margin-bottom: 20px; transition: var(--transition); 
-        }
-        .kiosk-input:focus { outline: none; animation: pulseRed 2s infinite; }
+        .export-controls { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+        .export-select { padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white; font-weight: bold; }
 
-        /* Badges */
-        .duration-badge { font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; display: inline-block; transition: var(--transition); }
-        .dur-safe { background: var(--green-guard); color: white; }
-        .dur-warning { background: var(--warning-orange); color: white; }
-        .dur-danger { 
-            background: var(--red-main); color: white; 
-            animation: bumper 0.4s infinite; 
-            box-shadow: 0 0 10px rgba(211, 47, 47, 0.5);
-        }
-
-        .admin-only, .guard-only { display: none; }
-        .view-only-tag { color: #888; font-size: 0.7rem; font-style: italic; }
-
-        @media print { 
-            body * { visibility: hidden; } 
-            #print-area, #print-area * { visibility: visible; } 
-            #print-area { position: absolute; top: 0; left: 0; width: 300px; text-align: center; } 
-        }
+        .admin-only { display: none; }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } }
     </style>
 </head>
 <body>
 
 <div id="login-overlay" class="parking-bg">
     <div class="glass-card" id="role-selection">
-        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 80px; margin-bottom: 10px; border-radius: 50%;">
-        <h1 style="color:var(--red-main); margin:0;">METRO PLAZA BAGONG SILANG</h1>
-        <p style="margin-bottom:30px; color:#555; font-weight: bold;">SELECT ACCESS LEVEL</p>
-        <button onclick="showGuardLogin()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem; margin-bottom:15px;">🛡️ GUARD ACCESS</button>
-        <button onclick="showAdminLogin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">🔑 ADMIN LOGIN</button>
-    </div>
-
-    <div class="glass-card" id="guard-login" style="display:none;">
-        <h1 style="color:var(--green-guard); margin:0;">GUARD LOGIN</h1>
-        <div class="input-group">
-            <input type="password" id="guard-pass" placeholder="GUARD PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; text-align: center; box-sizing: border-box;">
-            <span class="toggle-btn" onclick="togglePass('guard-pass', this)">SHOW</span>
-        </div>
-        <button onclick="verifyGuard()" style="width:100%; padding:15px; background:var(--green-guard); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY</button>
-        <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
-    </div>
-
-    <div class="glass-card" id="admin-login" style="display:none;">
-        <h1 style="color:var(--red-main); margin:0;">ADMIN LOGIN</h1>
-        <div class="input-group">
-            <input type="password" id="pass" placeholder="PIN" style="width:100%; padding:15px; border-radius:10px; border:1px solid #ddd; text-align: center; box-sizing: border-box;">
-            <span class="toggle-btn" onclick="togglePass('pass', this)">SHOW</span>
-        </div>
-        <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY</button>
-        <p onclick="forgotPin()" style="font-size: 0.8rem; color: #888; cursor: pointer; text-decoration: underline; margin-top: 15px;">Forgot Master PIN?</p>
-        <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
-    </div>
-</div>
-
-<div id="kiosk-view" class="parking-bg" style="flex-direction: column;">
-    <div class="kiosk-nav" style="position: absolute; top: 0; width: 100%; box-sizing: border-box;">
-        <span>METRO PLAZA BAGONG SILANG KIOSK</span>
-        <button onclick="exitKiosk()" style="background:var(--red-main); border:none; color:white; padding: 8px 15px; border-radius:5px;">← BACK</button>
-    </div>
-    <div style="text-align:center; color:white;">
-        <h1 style="font-size: 4rem; margin: 0;">WELCOME</h1>
-        <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
-        <br>
-        <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; font-weight: bold;">CHECK-IN & PRINT</button>
-        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold;"></div>
+        <h1>METRO PLAZA</h1>
+        <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer;">ADMIN LOGIN (PIN: 0526)</button>
     </div>
 </div>
 
 <div id="sidebar">
-    <div class="sidebar-brand">
-        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRuxO9VJp_ZF82KTCFW4-fkQiJpE60yZ0Atng&s" style="width: 50px; border-radius: 50%; margin-bottom: 10px;">
-        <h2 style="margin:0;">METRO PLAZA BAGONG SILANG</h2>
-        <small id="user-role-tag">SYSTEM</small>
-    </div>
-    <div class="nav-item" id="bt-status" onclick="connectPrinter()" style="background: #1a5a1e; color: white;">🖨️ CONNECT PRINTER</div>
+    <div class="sidebar-brand"><h2>METRO PLAZA</h2></div>
     <div class="nav-item active" onclick="showTab('dash', this)"> DASHBOARD</div>
-    <div class="nav-item" onclick="showTab('hist', this)"> 🕒 HISTORY</div>
     <div class="nav-item admin-only" onclick="showTab('sale', this)">💰 SALES REPORT</div>
-    <div class="nav-item admin-only" onclick="showTab('arch', this)" style="background: #263238;">♻️ RECYCLE BIN</div>
-    <div class="nav-item admin-only" onclick="showTab('settings', this)">⚙️ SETTINGS</div>
-    <div class="nav-item guard-only" onclick="enterKiosk()" style="color:var(--red-main); margin-top:30px; font-weight: bold;">🖥️ OPEN KIOSK MODE</div>
     <div class="nav-item" onclick="location.reload()" style="margin-top:auto; background:#b71c1c; color:white; text-align:center;">LOGOUT</div>
 </div>
 
 <div id="main-content">
-    <div class="header-bar">
-        <h2 id="view-title">PARKING OVERVIEW</h2>
-        <div id="clock" style="font-weight: bold; color: var(--red-main);"></div>
-    </div>
-
     <div id="dash" class="tab-view">
-        <h3 style="color: var(--green-guard); margin-bottom: 10px;"> ACTIVE PARKING (NORMAL)</h3>
+        <h2>ACTIVE PARKING</h2>
         <div class="table-container">
             <table>
-                <thead>
-                    <tr>
-                        <th>PLATE</th><th>TIME IN</th><th>DURATION</th><th>FEE</th><th>STATUS</th><th>DATE</th><th>ACTION</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>PLATE</th><th>TIME IN</th><th>FEE</th><th>ACTION</th></tr></thead>
                 <tbody id="table-dash-normal"></tbody>
-            </table>
-        </div>
-
-        <h3 style="color: var(--red-main); margin-top: 30px; margin-bottom: 10px;">⚠️ OVERTIME PARKING (4H above)</h3>
-        <div class="table-container" style="border-top: 5px solid var(--red-main);">
-            <table>
-                <thead>
-                    <tr>
-                        <th>PLATE</th><th>TIME IN</th><th>DURATION</th><th>FEE</th><th>STATUS</th><th>DATE</th><th>ACTION</th>
-                    </tr>
-                </thead>
-                <tbody id="table-dash-overtime"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="hist" class="tab-view" style="display:none">
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-hist', this.value)">
-            <input type="date" class="search-box" onchange="filterByDate('table-hist', this.value)" style="width: 160px;">
-            <button class="btn-clear admin-only" onclick="archiveEntireCollection('parking_history')">🗄️ ARCHIVE ALL</button>
-        </div>
-        <div class="table-container">
-            <table>
-                <thead><tr><th>PLATE</th><th>IN</th><th>OUT</th><th>DATE</th><th>ACTION</th></tr></thead>
-                <tbody id="table-hist"></tbody>
             </table>
         </div>
     </div>
 
     <div id="sale" class="tab-view admin-only" style="display:none">
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
             <input type="text" class="search-box" placeholder="Search Plate..." onkeyup="filterTable('table-sale', this.value)">
-            <input type="date" class="search-box" onchange="filterByDate('table-sale', this.value)" style="width: 160px;">
-            <button class="btn-clear" onclick="archiveEntireCollection('sales_report')">🗄️ ARCHIVE ALL</button>
+            
+            <div class="export-controls">
+                <select id="exportRange" class="export-select">
+                    <option value="today">Daily (Today)</option>
+                    <option value="weekly">Weekly (7 Days)</option>
+                    <option value="monthly">Monthly (30 Days)</option>
+                </select>
+                <button class="btn-export" onclick="exportSalesToExcel()">📊 DOWNLOAD EXCEL</button>
+            </div>
         </div>
+        
         <div class="table-container">
             <table>
-                <thead><tr><th>REF #</th><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th><th>ACTION</th></tr></thead>
+                <thead><tr><th>REF #</th><th>PLATE</th><th>TOTAL FEE</th><th>DATE</th></tr></thead>
                 <tbody id="table-sale"></tbody>
             </table>
         </div>
+
         <div class="sales-summary">
-            <div class="total-bar"><span>TODAY'S COLLECTION</span><span id="today-total" style="font-size: 1.8rem; color: #4caf50;">P0.00</span></div>
-            <div class="total-bar"><span>GRAND TOTAL</span><span id="grand-total" style="font-size: 1.8rem; color: var(--red-main);">P0.00</span></div>
-        </div>
-    </div>
-
-    <div id="arch" class="tab-view admin-only" style="display:none">
-        <h3 style="color: #555;">♻️ RECYCLE BIN</h3>
-        <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">Empty BIN</button>
-        <div class="table-container">
-            <table>
-                <thead><tr><th>PLATE</th><th>TYPE</th><th>DELETED AT</th><th>ACTION</th></tr></thead>
-                <tbody id="table-arch"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="settings" class="tab-view admin-only" style="display:none">
-        <div style="display: flex; justify-content: center; padding-top: 50px;">
-            <div class="glass-card" style="width: 450px; border-top: 8px solid var(--dark-bg); background: var(--cream-bg);">
-                <h2 style="color: var(--dark-bg); margin: 0;">SYSTEM SECURITY</h2>
-                <p style="color: #888; font-size: 0.85rem; margin-bottom: 25px;">Manage access credentials.</p>
-                <div style="text-align: left; margin-bottom: 20px; padding: 0 10px;">
-                    <label style="font-weight: bold; color: var(--dark-bg);">Guard PIN:</label>
-                    <input type="text" id="new-guard-pin" class="search-box" style="width: 100%; margin-top: 8px; font-size: 1.2rem; text-align: center; border: 2px solid #ddd;">
-                    <button onclick="updatePin('guard')" style="width: 100%; padding: 12px; background: var(--green-guard); color: white; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; font-weight: bold;">💾 UPDATE GUARD PIN</button>
-                </div>
-                <div style="text-align: left; padding: 0 10px;">
-                    <label style="font-weight: bold; color: var(--dark-bg);">Admin PIN:</label>
-                    <input type="text" id="new-admin-pin" class="search-box" style="width: 100%; margin-top: 8px; font-size: 1.2rem; text-align: center; border: 2px solid #ddd;">
-                    <button onclick="updatePin('admin')" style="width: 100%; padding: 12px; background: var(--red-main); color: white; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; font-weight: bold;">🔑 UPDATE ADMIN PIN</button>
-                </div>
-                <p style="margin-top: 20px; font-size: 0.75rem; color: #bbb;">Only Administrators can modify these settings.</p>
-            </div>
+            <div class="total-bar"><h3>DAILY</h3><span id="today-total">P0.00</span></div>
+            <div class="total-bar"><h3>WEEKLY</h3><span id="weekly-total">P0.00</span></div>
+            <div class="total-bar"><h3>MONTHLY</h3><span id="monthly-total">P0.00</span></div>
         </div>
     </div>
 </div>
 
-<div id="print-area"></div>
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot, writeBatch, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
         authDomain: "metroplaza-13b5e.firebaseapp.com",
         projectId: "metroplaza-13b5e",
         storageBucket: "metroplaza-13b5e.firebasestorage.app",
-        messagingSenderId: "958136196486",
-        appId: "1:958136196486:web:28292dcd6cd5f2bbfae007",
         databaseURL: "https://metroplaza-13b5e-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
-
+    
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const rtdb = getDatabase(app);
-    
-    let currentUserRole = "guard"; 
-    let printerCharacteristic = null;
-    let activeParkingCache = [];
-    const MASTER_KEY = "METRO2026";
+    let salesSnap = [];
 
-    // --- CLOCK SYNC ENGINE ---
-    let serverOffset = 0;
-    const offsetRef = ref(rtdb, ".info/serverTimeOffset");
-    onValue(offsetRef, (snap) => { serverOffset = snap.val() || 0; });
-
-    function getSyncedTime() { return Date.now() + serverOffset; }
-
-    // --- PASSWORD TOGGLE LOGIC ---
-    window.togglePass = (id, el) => {
-        const input = document.getElementById(id);
-        input.type = input.type === "password" ? "text" : "password";
-        el.innerText = input.type === "password" ? "SHOW" : "HIDE";
-    };
-
-    // --- BLUETOOTH & PRINTING ---
-    window.connectPrinter = async () => {
-        try {
-            const device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] });
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-            const characteristics = await service.getCharacteristics();
-            printerCharacteristic = characteristics.find(c => c.properties.write);
-            document.getElementById('bt-status').innerText = "✅ PRINTER CONNECTED";
-            document.getElementById('bt-status').style.background = "#2e7d32";
-        } catch (e) { alert("Bluetooth Error: " + e.message); }
-    };
-
-    const printReceipt = async (text) => {
-        if (!printerCharacteristic) return false;
-        try {
-            const encoder = new TextEncoder();
-            const data = encoder.encode('\x1B\x40' + text + '\n\n\n\x1D\x56\x41');
-            await printerCharacteristic.writeValue(data);
-            return true;
-        } catch (e) { return false; }
-    };
-
-    const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\n\x1B\x21\x30   ENTRY TICKET\x1B\x21\x00\n-------------------------\nPLATE:      ${plate}\nDATE:        ${date}\nTIME IN:    ${entryTime}\n-------------------------\nPlease keep this ticket.\nThank you!\n`;
-        const printed = await printReceipt(receiptStr);
-        if (!printed) {
-            document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:280px; padding:15px; background:white; margin: auto; color: black; border: 3px solid black;"><h2 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h2><h3 style="margin:0; font-size: 0.9rem;">BAGONG SILANG BRANCH</h3><div style="border-top: 2px dashed black; margin: 10px 0;"></div><span style="font-size: 2.2rem; font-weight: 900; display: block; padding: 5px 0;">ENTRY TICKET</span><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="text-align:left; font-size: 1.2rem; line-height: 1.6;"><b>PLATE: ${plate}</b><br><b>DATE:</b> ${date}<br><b>TIME IN:</b> ${entryTime}<br></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><p style="font-size: 0.9rem; font-weight: bold;">KEEP THIS TICKET<br>WELCOME!</p></div>`;
-            window.print();
+    window.loginAdmin = () => {
+        const pin = prompt("Enter Admin PIN:");
+        if(pin === "0526") {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('sidebar').style.display = 'flex';
+            document.getElementById('main-content').style.display = 'block';
         }
     };
 
-    // --- AUTH ---
-    window.showGuardLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('guard-login').style.display = 'block'; };
-    window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
-    
-    window.verifyGuard = async () => { 
-        const input = document.getElementById('guard-pass').value;
-        const snap = await getDoc(doc(db, "settings", "credentials"));
-        const storedPin = snap.exists() ? snap.data().guard : "321";
-        if(input === storedPin) { currentUserRole = "guard"; loginSuccess(" GUARD "); } else { alert("Access Denied"); } 
-    };
+    // --- REAL-TIME SALES DATA ---
+    onSnapshot(collection(db, "sales_report"), (snap) => {
+        salesSnap = snap.docs;
+        renderSales();
+    });
 
-    window.loginAdmin = async () => { 
-        const input = document.getElementById('pass').value;
-        const snap = await getDoc(doc(db, "settings", "credentials"));
-        const storedPin = snap.exists() ? snap.data().admin : "0526";
-        if(input === storedPin) { currentUserRole = "admin"; loginSuccess(" ADMIN "); } else { alert("Access Denied"); } 
-    };
-
-    window.forgotPin = () => {
-        const master = prompt("ENTER SYSTEM MASTER KEY:");
-        if(master === MASTER_KEY) {
-            currentUserRole = "admin";
-            loginSuccess("🔑 MASTER RECOVERY");
-            showTab('settings', document.querySelector('[onclick*="settings"]'));
-        } else { alert("Invalid Master Key."); }
-    };
-
-    window.updatePin = async (role) => {
-        if(currentUserRole !== "admin") return alert("Unauthorized");
-        const val = document.getElementById(`new-${role}-pin`).value;
-        if(val.length < 3) return alert("PIN too short!");
-        await setDoc(doc(db, "settings", "credentials"), { [role]: val }, { merge: true });
-        alert(`${role.toUpperCase()} PIN updated!`);
-    };
-
-    window.backToSelection = () => { document.getElementById('role-selection').style.display = 'block'; document.getElementById('admin-login').style.display = 'none'; document.getElementById('guard-login').style.display = 'none'; };
-
-    function loginSuccess(tag) {
-        document.getElementById('user-role-tag').innerText = tag;
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = (currentUserRole === "admin") ? 'block' : 'none');
-        document.querySelectorAll('.guard-only').forEach(el => el.style.display = (currentUserRole === "guard") ? 'block' : 'none');
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('sidebar').style.display = 'flex';
-        document.getElementById('main-content').style.display = 'block';
-        renderHistory(); renderSales();
-    }
-
-    // --- CORE PARKING LOGIC ---
-    function formatDuration(ms) {
-        const safeMs = Math.max(0, ms);
-        const hrs = Math.floor(safeMs / (1000 * 60 * 60));
-        const mins = Math.floor((safeMs % (1000 * 60 * 60)) / (1000 * 60));
-        return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe") };
-    }
-
-    function calculatePayment(msIn) {
-        const diff = getSyncedTime() - msIn;
-        const hrsElapsed = Math.ceil(Math.max(0, diff) / (1000 * 60 * 60));
-        const totalHrs = Math.max(1, hrsElapsed);
-        return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
-    }
-
-    window.checkOut = async (plate) => {
-        const data = activeParkingCache.find(d => d.plate === plate);
-        if(!data) return;
-        const now = getSyncedTime();
-        const outTime = new Date(now).toLocaleTimeString();
-        const payment = calculatePayment(data.rawIn);
-        const diff = now - data.rawIn;
-        const hrs = Math.max(1, Math.ceil(Math.max(0, diff) / (1000 * 60 * 60)));
+    function renderSales() {
+        let monthly = 0, today = 0, weekly = 0;
+        const now = Date.now();
+        const todayStr = new Date().toLocaleDateString();
         
-        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
-        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: now });
-        const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
-        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\nREF NO:    ${refNo}\nPLATE:      ${plate}\nDATE:        ${new Date().toLocaleDateString()}\nTIME IN:    ${data.entryTime}\nTIME OUT:   ${outTime}\nDURATION:   ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\n`;
-        const printed = await printReceipt(receiptStr);
-        if (!printed) {
-            document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:280px; padding:15px; background:white; margin: auto; color: black; border: 3px solid black;"><h3 style="margin:0; font-size: 1rem;">METRO PLAZA</h3><h4 style="margin:0; font-size: 0.9rem;">BAGONG SILANG BRANCH</h4><div style="border-top: 1px dashed black; margin: 10px 0;"></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="text-align:left; font-size: 0.9rem; line-height: 1.4;"><b>REF NO: ${refNo}</b><br><b>PLATE: ${plate}</b><br>DATE: ${new Date().toLocaleDateString()}<br>IN: ${data.entryTime} | OUT: ${outTime}<br>DURATION: ${hrs} hr(s)</div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="padding: 10px 0;"><span style="font-size: 1.1rem; font-weight: bold;">TOTAL FEE</span><br><span style="font-size: 1.5rem; font-weight: 900;">P${payment}.00</span></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div></div>`;
-            window.print();
-        }
-        await deleteDoc(doc(db, "active_parking", plate));
-    };
+        const html = salesSnap.map(d => {
+            const r = d.data();
+            const fee = Number(r.pay) || 0;
+            const ts = r.timestamp || 0;
+            
+            // Logic for totals
+            if (ts >= now - (30 * 86400000)) monthly += fee;
+            if (ts >= now - (7 * 86400000)) weekly += fee;
+            if (r.date === todayStr) today += fee;
 
-    onSnapshot(collection(db, "active_parking"), snap => {
-        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-        updateDashboard();
-    });
+            return `<tr><td>#${d.id.substring(0,5)}</td><td>${r.plate}</td><td>P${fee}</td><td>${r.date}</td></tr>`;
+        }).join('');
 
-    function updateDashboard() {
-        let normalHTML = "", overtimeHTML = "";
-        activeParkingCache.forEach(r => {
-            const now = getSyncedTime();
-            const timeElapsed = now - r.rawIn;
-            const dur = formatDuration(timeElapsed);
-            const fee = calculatePayment(r.rawIn);
-            const actionCell = currentUserRole === 'guard' ? `<button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button>` : `<span style="color:#888; font-size:0.8rem; font-weight:bold;">VIEW ONLY</span>`;
-            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td style="font-weight:bold; color:var(--red-main)">P${fee}.00</td><td><span style="color:${timeElapsed >= 14400000 ? 'red' : 'green'}">● ${timeElapsed >= 14400000 ? 'OVERTIME' : 'PARKED'}</span></td><td>${r.date}</td><td>${actionCell}</td></tr>`;
-            if (timeElapsed >= 14400000) overtimeHTML += row; else normalHTML += row;
-        });
-        document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7">No active parking</td></tr>';
-        document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7">No overtime vehicles</td></tr>';
+        document.getElementById('table-sale').innerHTML = html;
+        document.getElementById('today-total').innerText = "P" + today.toFixed(2);
+        document.getElementById('weekly-total').innerText = "P" + weekly.toFixed(2);
+        document.getElementById('monthly-total').innerText = "P" + monthly.toFixed(2);
     }
 
-    setInterval(updateDashboard, 1000); // UI Refresh loop
+    // --- BULLETPROOF EXCEL EXPORT ---
+    window.exportSalesToExcel = () => {
+        if (!window.XLSX) return alert("Excel library still loading...");
+        if (salesSnap.length === 0) return alert("No data to export.");
 
-    // --- ARCHIVE ---
-    window.moveToArchive = async (sourceCol, id) => {
-        if(!confirm("Move to Recycle Bin?")) return;
-        const docSnap = await getDoc(doc(db, sourceCol, id));
-        if (docSnap.exists()) {
-            await addDoc(collection(db, "archive"), { ...docSnap.data(), originalCol: sourceCol, deletedAt: new Date().toLocaleString() });
-            await deleteDoc(doc(db, sourceCol, id));
-        }
-    };
+        const range = document.getElementById('exportRange').value;
+        const now = Date.now();
+        const todayStr = new Date().toLocaleDateString();
 
-    window.archiveEntireCollection = async (colName) => {
-        if(!confirm(`Archive ALL in ${colName}?`)) return;
-        const snap = await getDocs(collection(db, colName));
-        const batch = writeBatch(db);
-        snap.forEach(d => {
-            addDoc(collection(db, "archive"), { ...d.data(), originalCol: colName, deletedAt: new Date().toLocaleString() });
-            batch.delete(d.ref);
+        const filtered = salesSnap.filter(d => {
+            const r = d.data();
+            const ts = r.timestamp || 0;
+            if (range === 'today') return r.date === todayStr;
+            if (range === 'weekly') return ts >= now - (7 * 86400000);
+            if (range === 'monthly') return ts >= now - (30 * 86400000);
+            return true;
         });
-        await batch.commit();
+
+        if (filtered.length === 0) return alert("No records found for this period.");
+
+        const data = filtered.map(d => ({
+            "Reference": d.id.toUpperCase(),
+            "Plate": d.data().plate,
+            "Fee": d.data().pay,
+            "Date": d.data().date
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Sales");
+        XLSX.writeFile(wb, `MetroPlaza_${range}_Report.xlsx`);
     };
 
-    window.restoreFromArchive = async (id) => {
-        const docSnap = await getDoc(doc(db, "archive", id));
-        if (docSnap.exists()) {
-            const data = docSnap.data(); const col = data.originalCol;
-            delete data.originalCol; delete data.deletedAt;
-            await addDoc(collection(db, col), data);
-            await deleteDoc(doc(db, "archive", id));
-        }
-    };
-
-    window.finalDelete = async (id) => { if(confirm("Permanently delete?")) await deleteDoc(doc(db, "archive", id)); };
-    window.clearCollection = async (col) => { if(confirm("EMPTY BIN?")) { const s = await getDocs(collection(db, col)); const b = writeBatch(db); s.forEach(d => b.delete(d.ref)); await b.commit(); }};
-
-    // --- KIOSK ---
-    window.kioskCheckIn = async () => {
-        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
-        if(!plate) return;
-        const now = getSyncedTime();
-        const inTime = new Date(now).toLocaleTimeString(); const dt = new Date(now).toLocaleDateString();
-        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: inTime, rawIn: now, date: dt });
-        await printEntryTicket(plate, inTime, dt);
-        document.getElementById('kiosk-feedback').innerText = "✅ PRINTING...";
-        document.getElementById('kioskPlate').value = "";
-        setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 3000);
-    };
-
-    window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
-    window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
-
-    // --- RENDERING & TABS ---
-    let historySnap = []; let salesSnap = [];
-    const renderHistory = () => {
-        document.getElementById('table-hist').innerHTML = historySnap.map(d => {
-            const r = d.data(); const act = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('parking_history', '${d.id}')">🗑️</button></td>` : `<td><span class="view-only-tag">View</span></td>`;
-            return `<tr><td>${r.plate}</td><td>${r.entryTime}</td><td>${r.out}</td><td>${r.date}</td>${act}</tr>`;
-        }).reverse().join('');
-    };
-    const renderSales = () => {
-        let g = 0, t = 0; const today = new Date().toLocaleDateString();
-        document.getElementById('table-sale').innerHTML = salesSnap.map(d => {
-            const r = d.data(); const ref = d.id.substring(0, 8).toUpperCase();
-            g += Number(r.pay); if(r.date === today) t += Number(r.pay);
-            const act = (currentUserRole === 'admin') ? `<td><button class="btn-delete" onclick="moveToArchive('sales_report', '${d.id}')">🗑️</button></td>` : `<td>-</td>`;
-            return `<tr><td>#${ref}</td><td><b>${r.plate}</b></td><td style="color:red; font-weight:bold;">P${r.pay}</td><td>${r.date}</td>${act}</tr>`;
-        }).reverse().join('');
-        document.getElementById('grand-total').innerText = "P" + g.toFixed(2);
-        document.getElementById('today-total').innerText = "P" + t.toFixed(2);
-    };
-
-    onSnapshot(collection(db, "parking_history"), snap => { historySnap = snap.docs; renderHistory(); });
-    onSnapshot(collection(db, "sales_report"), snap => { salesSnap = snap.docs; renderSales(); });
-    onSnapshot(collection(db, "archive"), snap => {
-        document.getElementById('table-arch').innerHTML = snap.docs.map(doc => {
-            const r = doc.data(); return `<tr><td><b>${r.plate}</b></td><td>${r.originalCol.toUpperCase()}</td><td>${r.deletedAt}</td><td><button class="btn-restore" onclick="restoreFromArchive('${doc.id}')">Restore</button><button class="btn-delete" onclick="finalDelete('${doc.id}')">X</button></td></tr>`;
-        }).reverse().join('');
-    });
-
-    window.filterTable = (id, q) => document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none");
-    window.filterByDate = (id, val) => {
-        if(!val) return document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = "");
-        const [y, m, d] = val.split('-'); const fmt = `${parseInt(m)}/${parseInt(d)}/${y}`;
-        document.querySelectorAll(`#${id} tr`).forEach(r => r.style.display = r.innerText.includes(fmt) ? "" : "none");
-    };
-
-    window.showTab = async (id, el) => {
+    window.showTab = (id, el) => {
         document.querySelectorAll('.tab-view').forEach(v => v.style.display = 'none');
         document.getElementById(id).style.display = 'block';
         document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
-        document.getElementById('view-title').innerText = el.innerText.trim();
-        if(id === 'settings') {
-            const snap = await getDoc(doc(db, "settings", "credentials"));
-            if(snap.exists()) {
-                document.getElementById('new-guard-pin').value = snap.data().guard || "321";
-                document.getElementById('new-admin-pin').value = snap.data().admin || "0526";
-            }
-        }
     };
 
-    setInterval(() => { document.getElementById('clock').innerText = new Date(getSyncedTime()).toLocaleString(); }, 1000);
+    window.filterTable = (id, q) => {
+        document.querySelectorAll(`#${id} tr`).forEach(r => {
+            r.style.display = r.innerText.toUpperCase().includes(q.toUpperCase()) ? "" : "none";
+        });
+    };
 </script>
 </body>
 </html>
