@@ -6,15 +6,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { 
-            --red-main: #d32f2f;
-            --red-dark: #b71c1c; 
-            --dark-bg: #1a1a1a; 
-            --glass: rgba(255, 255, 255, 0.95); 
-            --text-light: #f5f5f5;
-            --green-guard: #2e7d32; 
-            --blue-archive: #1976d2;
-            --warning-orange: #ef6c00; 
-            --cream-bg: #fffcf5;
+            --red-main: #d32f2f; --red-dark: #b71c1c; --dark-bg: #1a1a1a; 
+            --glass: rgba(255, 255, 255, 0.95); --text-light: #f5f5f5;
+            --green-guard: #2e7d32; --blue-archive: #1976d2;
+            --warning-orange: #ef6c00; --cream-bg: #fffcf5;
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
@@ -23,11 +18,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
         @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        
-        @keyframes highlightRestore {
-            0% { background-color: #e8f5e9; }
-            100% { background-color: transparent; }
-        }
+        @keyframes highlightRestore { 0% { background-color: #e8f5e9; } 100% { background-color: transparent; } }
 
         .parking-bg {
             position: fixed; inset: 0; z-index: 2500;
@@ -45,12 +36,7 @@
         }
 
         .input-group { position: relative; width: 100%; margin-bottom: 20px; }
-        .toggle-btn {
-            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
-            background: none; border: none; color: #888; cursor: pointer;
-            font-size: 0.75rem; font-weight: bold; user-select: none;
-        }
-        .toggle-btn:hover { color: var(--red-main); }
+        .toggle-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; font-size: 0.75rem; font-weight: bold; user-select: none; }
 
         #sidebar { width: 280px; background: var(--dark-bg); color: white; display: none; flex-direction: column; z-index: 10; animation: slideIn 0.4s ease-out; }
         .sidebar-brand { padding: 40px 25px; background: var(--red-main); text-align: center; }
@@ -66,7 +52,6 @@
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 15px; text-align: left; color: #666; font-size: 0.75rem; border-bottom: 2px solid #eee; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-        tr:hover { background-color: #fcfcfc; }
         
         .btn-release { background: var(--red-main); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: var(--transition); }
         .btn-delete { background: #444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
@@ -129,7 +114,6 @@
             <span class="toggle-btn" onclick="togglePass('pass', this)">SHOW</span>
         </div>
         <button onclick="loginAdmin()" style="width:100%; padding:15px; background:var(--red-main); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">VERIFY</button>
-        <p onclick="forgotPin()" style="font-size: 0.8rem; color: #888; cursor: pointer; text-decoration: underline; margin-top: 15px;">Forgot Master PIN?</p>
         <button onclick="backToSelection()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; margin-top:10px;">Go Back</button>
     </div>
 </div>
@@ -291,11 +275,11 @@
     let printerCharacteristic = null;
     let activeParkingCache = [];
     let lastRestoredId = null;
-    const MASTER_KEY = "METRO2026";
 
     let serverOffset = 0;
     const offsetRef = ref(rtdb, ".info/serverTimeOffset");
     onValue(offsetRef, (snap) => { serverOffset = snap.val() || 0; });
+
     function getSyncedTime() { return Date.now() + serverOffset; }
 
     window.togglePass = (id, el) => {
@@ -337,7 +321,7 @@
 
     window.showGuardLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('guard-login').style.display = 'block'; };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
-    
+
     window.verifyGuard = async () => { 
         const input = document.getElementById('guard-pass').value;
         const snap = await getDoc(doc(db, "settings", "credentials"));
@@ -350,15 +334,6 @@
         const snap = await getDoc(doc(db, "settings", "credentials"));
         const storedPin = snap.exists() ? snap.data().admin : "0526";
         if(input === storedPin) { currentUserRole = "admin"; loginSuccess(" ADMIN "); } else { alert("Access Denied"); } 
-    };
-
-    window.forgotPin = () => {
-        const master = prompt("ENTER SYSTEM MASTER KEY:");
-        if(master === MASTER_KEY) {
-            currentUserRole = "admin";
-            loginSuccess("🔑 MASTER RECOVERY");
-            showTab('settings', document.querySelector('[onclick*="settings"]'));
-        } else { alert("Invalid Master Key."); }
     };
 
     window.updatePin = async (role) => {
@@ -403,8 +378,9 @@
         const payment = calculatePayment(data.rawIn);
         const diff = now - data.rawIn;
         const hrs = Math.max(1, Math.ceil(Math.max(0, diff) / (1000 * 60 * 60)));
-        await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
-        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: now });
+        const salesRef = await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
+        await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: now });
+        
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
         const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\nREF NO:    ${refNo}\nPLATE:      ${plate}\nDATE:        ${new Date().toLocaleDateString()}\nTIME IN:    ${data.entryTime}\nTIME OUT:   ${outTime}\nDURATION:   ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\n`;
         const printed = await printReceipt(receiptStr);
@@ -428,6 +404,7 @@
             const dur = formatDuration(timeElapsed);
             const fee = calculatePayment(r.rawIn);
             const actionCell = currentUserRole === 'guard' ? `<button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button>` : `<span style="color:#888; font-size:0.8rem; font-weight:bold;">VIEW ONLY</span>`;
+            
             const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td style="font-weight:bold; color:var(--red-main)">P${fee}.00</td><td><span style="color:${timeElapsed >= 14400000 ? 'red' : 'green'}">● ${timeElapsed >= 14400000 ? 'OVERTIME' : 'PARKED'}</span></td><td>${r.date}</td><td>${actionCell}</td></tr>`;
             if (timeElapsed >= 14400000) overtimeHTML += row; else normalHTML += row;
         });
@@ -492,7 +469,8 @@
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
     window.exitKiosk = () => document.getElementById('kiosk-view').style.display = 'none';
 
-    let historySnap = []; let salesSnap = [];
+    let historySnap = [];
+    let salesSnap = [];
     const renderHistory = () => {
         document.getElementById('table-hist').innerHTML = historySnap.map(d => {
             const r = d.data(); 
@@ -529,29 +507,31 @@
         document.getElementById('weekly-total').innerText = "P" + weeklyTotal.toFixed(2);
     };
 
-    // FIXED EXPORT FUNCTION WITH CHOICES
     window.exportSalesToExcel = () => {
         if (salesSnap.length === 0) return alert("No sales data to export!");
-        
         const range = document.getElementById('exportRange').value;
         const now = getSyncedTime();
         const todayDate = new Date(now).toLocaleDateString();
         const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
         const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
 
-        // Filter the data based on choice
+        let totalRevenue = 0;
         const filteredData = salesSnap.filter(d => {
             const r = d.data();
             const ts = r.timestamp || 0;
-            if (range === 'today') return r.date === todayDate;
-            if (range === 'weekly') return ts >= sevenDaysAgo;
-            if (range === 'monthly') return ts >= thirtyDaysAgo;
-            return true;
+            let match = false;
+            if (range === 'today') match = (r.date === todayDate);
+            else if (range === 'weekly') match = (ts >= sevenDaysAgo);
+            else if (range === 'monthly') match = (ts >= thirtyDaysAgo);
+            else match = true;
+
+            if (match) totalRevenue += Number(r.pay);
+            return match;
         });
 
-        if (filteredData.length === 0) return alert(`No data found for the selected ${range} range.`);
+        if (filteredData.length === 0) return alert(`No data found for ${range}.`);
 
-        // Map the data for Excel columns
+        // Create Header and Rows
         const excelRows = filteredData.map(d => {
             const r = d.data();
             return {
@@ -563,12 +543,18 @@
             };
         });
 
-        // Create the workbook
+        // ADD REVENUE TOTAL AT THE BOTTOM
+        excelRows.push({
+            "REFERENCE ID": "---",
+            "PLATE NUMBER": "TOTAL REVENUE",
+            "FEE COLLECTED": `P${totalRevenue}.00`,
+            "DATE": "---",
+            "TIME LOGGED": "---"
+        });
+
         const worksheet = XLSX.utils.json_to_sheet(excelRows);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Sales_Data");
-        
-        // Generate and download file
         const fileName = `MetroPlaza_${range.toUpperCase()}_Sales_${todayDate.replace(/\//g, '-')}.xlsx`;
         XLSX.writeFile(workbook, fileName);
     };
