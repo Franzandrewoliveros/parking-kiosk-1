@@ -240,7 +240,7 @@
 
     <div id="arch" class="tab-view admin-only" style="display:none">
         <h3 style="color: #555;">♻️ RECYCLE BIN</h3>
-        <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">🧨 EMPTY BIN</button>
+        <button class="btn-clear" onclick="clearCollection('archive')" style="margin-bottom: 10px;">Empty BIN</button>
         <div class="table-container">
             <table>
                 <thead><tr><th>PLATE</th><th>TYPE</th><th>DELETED AT</th><th>ACTION</th></tr></thead>
@@ -275,6 +275,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, addDoc, onSnapshot, writeBatch, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDecxXNg2dcSM0rCPN_avxapxCXHfxXOSw",
@@ -282,26 +283,31 @@
         projectId: "metroplaza-13b5e",
         storageBucket: "metroplaza-13b5e.firebasestorage.app",
         messagingSenderId: "958136196486",
-        appId: "1:958136196486:web:28292dcd6cd5f2bbfae007"
+        appId: "1:958136196486:web:28292dcd6cd5f2bbfae007",
+        databaseURL: "https://metroplaza-13b5e-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const rtdb = getDatabase(app);
+    
     let currentUserRole = "guard"; 
     let printerCharacteristic = null;
     let activeParkingCache = [];
     const MASTER_KEY = "METRO2026";
 
+    // --- CLOCK SYNC ENGINE ---
+    let serverOffset = 0;
+    const offsetRef = ref(rtdb, ".info/serverTimeOffset");
+    onValue(offsetRef, (snap) => { serverOffset = snap.val() || 0; });
+
+    function getSyncedTime() { return Date.now() + serverOffset; }
+
     // --- PASSWORD TOGGLE LOGIC ---
     window.togglePass = (id, el) => {
         const input = document.getElementById(id);
-        if (input.type === "password") {
-            input.type = "text";
-            el.innerText = "HIDE";
-        } else {
-            input.type = "password";
-            el.innerText = "SHOW";
-        }
+        input.type = input.type === "password" ? "text" : "password";
+        el.innerText = input.type === "password" ? "SHOW" : "HIDE";
     };
 
     // --- BLUETOOTH & PRINTING ---
@@ -328,7 +334,7 @@
     };
 
     const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\n\x1B\x21\x30   ENTRY TICKET\x1B\x21\x00\n-------------------------\nPLATE:      ${plate}\nDATE:       ${date}\nTIME IN:    ${entryTime}\n-------------------------\nPlease keep this ticket.\nThank you!\n`;
+        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\n\x1B\x21\x30   ENTRY TICKET\x1B\x21\x00\n-------------------------\nPLATE:      ${plate}\nDATE:        ${date}\nTIME IN:    ${entryTime}\n-------------------------\nPlease keep this ticket.\nThank you!\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:280px; padding:15px; background:white; margin: auto; color: black; border: 3px solid black;"><h2 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h2><h3 style="margin:0; font-size: 0.9rem;">BAGONG SILANG BRANCH</h3><div style="border-top: 2px dashed black; margin: 10px 0;"></div><span style="font-size: 2.2rem; font-weight: 900; display: block; padding: 5px 0;">ENTRY TICKET</span><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="text-align:left; font-size: 1.2rem; line-height: 1.6;"><b>PLATE: ${plate}</b><br><b>DATE:</b> ${date}<br><b>TIME IN:</b> ${entryTime}<br></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><p style="font-size: 0.9rem; font-weight: bold;">KEEP THIS TICKET<br>WELCOME!</p></div>`;
@@ -336,7 +342,7 @@
         }
     };
 
-    // --- AUTH & MASTER KEY ---
+    // --- AUTH ---
     window.showGuardLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('guard-login').style.display = 'block'; };
     window.showAdminLogin = () => { document.getElementById('role-selection').style.display = 'none'; document.getElementById('admin-login').style.display = 'block'; };
     
@@ -385,13 +391,15 @@
 
     // --- CORE PARKING LOGIC ---
     function formatDuration(ms) {
-        const hrs = Math.floor(ms / (1000 * 60 * 60));
-        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        const safeMs = Math.max(0, ms);
+        const hrs = Math.floor(safeMs / (1000 * 60 * 60));
+        const mins = Math.floor((safeMs % (1000 * 60 * 60)) / (1000 * 60));
         return { text: `${hrs}h ${mins}m`, css: hrs >= 4 ? "dur-danger" : (hrs >= 2 ? "dur-warning" : "dur-safe") };
     }
 
     function calculatePayment(msIn) {
-        const hrsElapsed = Math.ceil((Date.now() - msIn) / (1000 * 60 * 60));
+        const diff = getSyncedTime() - msIn;
+        const hrsElapsed = Math.ceil(Math.max(0, diff) / (1000 * 60 * 60));
         const totalHrs = Math.max(1, hrsElapsed);
         return (totalHrs > 4) ? 20 + (totalHrs - 4) * 10 : 20;
     }
@@ -399,13 +407,16 @@
     window.checkOut = async (plate) => {
         const data = activeParkingCache.find(d => d.plate === plate);
         if(!data) return;
-        const outTime = new Date().toLocaleTimeString();
+        const now = getSyncedTime();
+        const outTime = new Date(now).toLocaleTimeString();
         const payment = calculatePayment(data.rawIn);
-        const hrs = Math.ceil((Date.now() - data.rawIn) / (1000 * 60 * 60));
+        const diff = now - data.rawIn;
+        const hrs = Math.max(1, Math.ceil(Math.max(0, diff) / (1000 * 60 * 60)));
+        
         await addDoc(collection(db, "parking_history"), { ...data, out: outTime });
-        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: Date.now() });
+        const salesRef = await addDoc(collection(db, "sales_report"), { plate, pay: payment, date: data.date, timestamp: now });
         const refNo = salesRef.id.substring(0, 8).toUpperCase(); 
-        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\nREF NO:    ${refNo}\nPLATE:      ${plate}\nDATE:       ${new Date().toLocaleDateString()}\nTIME IN:    ${data.entryTime}\nTIME OUT:   ${outTime}\nDURATION:   ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\n`;
+        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\nREF NO:    ${refNo}\nPLATE:      ${plate}\nDATE:        ${new Date().toLocaleDateString()}\nTIME IN:    ${data.entryTime}\nTIME OUT:   ${outTime}\nDURATION:   ${hrs} hr(s)\n-------------------------\nTOTAL FEE: P${payment}.00\n-------------------------\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:280px; padding:15px; background:white; margin: auto; color: black; border: 3px solid black;"><h3 style="margin:0; font-size: 1rem;">METRO PLAZA</h3><h4 style="margin:0; font-size: 0.9rem;">BAGONG SILANG BRANCH</h4><div style="border-top: 1px dashed black; margin: 10px 0;"></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="text-align:left; font-size: 0.9rem; line-height: 1.4;"><b>REF NO: ${refNo}</b><br><b>PLATE: ${plate}</b><br>DATE: ${new Date().toLocaleDateString()}<br>IN: ${data.entryTime} | OUT: ${outTime}<br>DURATION: ${hrs} hr(s)</div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="padding: 10px 0;"><span style="font-size: 1.1rem; font-weight: bold;">TOTAL FEE</span><br><span style="font-size: 1.5rem; font-weight: 900;">P${payment}.00</span></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div></div>`;
@@ -413,39 +424,30 @@
         }
         await deleteDoc(doc(db, "active_parking", plate));
     };
-// --- UPDATED REAL-TIME SYNC FOR DASHBOARD (GUARD ACCESS ONLY) ---
-onSnapshot(collection(db, "active_parking"), snap => {
-    activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
-    let normalHTML = "", overtimeHTML = "";
-    
-    activeParkingCache.forEach(r => {
-        const timeElapsed = Date.now() - r.rawIn;
-        const dur = formatDuration(timeElapsed);
-        const fee = calculatePayment(r.rawIn);
-        
-        // --- UPDATED LOGIC: GUARD GETS THE BUTTON, ADMIN IS VIEW ONLY ---
-        const actionCell = (currentUserRole === 'guard') 
-            ? `<button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button>` 
-            : `<span style="color:#888; font-size:0.8rem; font-weight:bold;">VIEW ONLY</span>`;
 
-        const row = `<tr>
-            <td><b>${r.plate}</b></td>
-            <td>${r.entryTime}</td>
-            <td><span class="duration-badge ${dur.css}">${dur.text}</span></td>
-            <td style="font-weight:bold; color:var(--red-main)">P${fee}.00</td>
-            <td><span style="color:${timeElapsed >= 14400000 ? 'red' : 'green'}">● ${timeElapsed >= 14400000 ? 'OVERTIME' : 'PARKED'}</span></td>
-            <td>${r.date}</td>
-            <td>${actionCell}</td>
-        </tr>`;
-        
-        if (timeElapsed >= 14400000) overtimeHTML += row; else normalHTML += row;
+    onSnapshot(collection(db, "active_parking"), snap => {
+        activeParkingCache = snap.docs.map(doc => doc.data()).filter(r => r.plate);
+        updateDashboard();
     });
-    
-    document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No active regular parking</td></tr>';
-    document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">No overtime vehicles</td></tr>';
-});
 
-    // --- ARCHIVE ENGINE ---
+    function updateDashboard() {
+        let normalHTML = "", overtimeHTML = "";
+        activeParkingCache.forEach(r => {
+            const now = getSyncedTime();
+            const timeElapsed = now - r.rawIn;
+            const dur = formatDuration(timeElapsed);
+            const fee = calculatePayment(r.rawIn);
+            const actionCell = currentUserRole === 'guard' ? `<button class="btn-release" onclick="checkOut('${r.plate}')">RELEASE</button>` : `<span style="color:#888; font-size:0.8rem; font-weight:bold;">VIEW ONLY</span>`;
+            const row = `<tr><td><b>${r.plate}</b></td><td>${r.entryTime}</td><td><span class="duration-badge ${dur.css}">${dur.text}</span></td><td style="font-weight:bold; color:var(--red-main)">P${fee}.00</td><td><span style="color:${timeElapsed >= 14400000 ? 'red' : 'green'}">● ${timeElapsed >= 14400000 ? 'OVERTIME' : 'PARKED'}</span></td><td>${r.date}</td><td>${actionCell}</td></tr>`;
+            if (timeElapsed >= 14400000) overtimeHTML += row; else normalHTML += row;
+        });
+        document.getElementById('table-dash-normal').innerHTML = normalHTML || '<tr><td colspan="7">No active parking</td></tr>';
+        document.getElementById('table-dash-overtime').innerHTML = overtimeHTML || '<tr><td colspan="7">No overtime vehicles</td></tr>';
+    }
+
+    setInterval(updateDashboard, 1000); // UI Refresh loop
+
+    // --- ARCHIVE ---
     window.moveToArchive = async (sourceCol, id) => {
         if(!confirm("Move to Recycle Bin?")) return;
         const docSnap = await getDoc(doc(db, sourceCol, id));
@@ -483,8 +485,9 @@ onSnapshot(collection(db, "active_parking"), snap => {
     window.kioskCheckIn = async () => {
         const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
         if(!plate) return;
-        const inTime = new Date().toLocaleTimeString(); const dt = new Date().toLocaleDateString();
-        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: inTime, rawIn: Date.now(), date: dt });
+        const now = getSyncedTime();
+        const inTime = new Date(now).toLocaleTimeString(); const dt = new Date(now).toLocaleDateString();
+        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: inTime, rawIn: now, date: dt });
         await printEntryTicket(plate, inTime, dt);
         document.getElementById('kiosk-feedback').innerText = "✅ PRINTING...";
         document.getElementById('kioskPlate').value = "";
@@ -544,7 +547,7 @@ onSnapshot(collection(db, "active_parking"), snap => {
         }
     };
 
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString(); }, 1000);
+    setInterval(() => { document.getElementById('clock').innerText = new Date(getSyncedTime()).toLocaleString(); }, 1000);
 </script>
 </body>
 </html>
