@@ -57,8 +57,8 @@
             padding: 8px 15px; border-radius: 50px; border: 1px solid #ddd;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05); font-weight: bold; font-size: 0.85rem;
         }
-        .indicator-admin { border-left: 4px solid var(--#2A2A2A); color: var(--#2A2A2A); }
-        .indicator-guard { border-left: 4px solid var(--#2A2A2A); color: var(--#2A2A2A); }
+        .indicator-admin { border-left: 4px solid var(--red-main); color: #2A2A2A; }
+        .indicator-guard { border-left: 4px solid var(--green-guard); color: #2A2A2A; }
 
         #clock { font-weight: bold; color: var(--blue-accent); font-size: 0.95rem; }
 
@@ -142,7 +142,7 @@
         <input type="text" id="kioskPlate" class="kiosk-input" placeholder="ABC 123">
         <br>
         <button onclick="kioskCheckIn()" style="background:var(--red-main); color:white; border:none; padding: 20px 80px; font-size: 2rem; border-radius: 15px; font-weight: bold;">CHECK-IN & PRINT</button>
-        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2.5rem; font-weight: bold;"></div>
+        <div id="kiosk-feedback" style="margin-top:25px; font-size: 2rem; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"></div>
     </div>
 </div>
 
@@ -330,7 +330,7 @@
     };
 
     const printEntryTicket = async (plate, entryTime, date) => {
-        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\n\x1B\x21\x30   ENTRY TICKET\x1B\x21\x00\n-------------------------\nPLATE:      ${plate}\nDATE:        ${date}\nTIME IN:    ${entryTime}\n-------------------------\nPlease keep this ticket.\nThank you!\n`;
+        const receiptStr = `\nMETRO PLAZA\nBAGONG SILANG BRANCH\n-------------------------\n\x1B\x21\x30   ENTRY TICKET\x1B\x21\x00\n-------------------------\nPLATE:       ${plate}\nDATE:        ${date}\nTIME IN:    ${entryTime}\n-------------------------\nPlease keep this ticket.\nThank you!\n`;
         const printed = await printReceipt(receiptStr);
         if (!printed) {
             document.getElementById('print-area').innerHTML = `<div style="font-family:monospace; text-align:center; width:280px; padding:15px; background:white; margin: auto; color: black; border: 3px solid black;"><h2 style="margin:0; font-size: 1.1rem;">METRO PLAZA</h2><h3 style="margin:0; font-size: 0.9rem;">BAGONG SILANG BRANCH</h3><div style="border-top: 2px dashed black; margin: 10px 0;"></div><span style="font-size: 2.2rem; font-weight: 900; display: block; padding: 5px 0;">ENTRY TICKET</span><div style="border-top: 2px dashed black; margin: 10px 0;"></div><div style="text-align:left; font-size: 1.2rem; line-height: 1.6;"><b>PLATE: ${plate}</b><br><b>DATE:</b> ${date}<br><b>TIME IN:</b> ${entryTime}<br></div><div style="border-top: 2px dashed black; margin: 10px 0;"></div><p style="font-size: 0.9rem; font-weight: bold;">KEEP THIS TICKET<br>WELCOME!</p></div>`;
@@ -486,16 +486,47 @@
     window.clearCollection = async (col) => { if(confirm("EMPTY BIN?")) { const s = await getDocs(collection(db, col)); const b = writeBatch(db);
         s.forEach(d => b.delete(d.ref)); await b.commit(); }};
 
+    // --- UPDATED KIOSK CHECK-IN WITH LTO VALIDATION ---
     window.kioskCheckIn = async () => {
-        const plate = document.getElementById('kioskPlate').value.trim().toUpperCase();
-        if(!plate) return;
+        const plateRaw = document.getElementById('kioskPlate').value.trim().toUpperCase();
+        if(!plateRaw) return;
+
+        // REGEX VALIDATION: Must have letters AND numbers (Standard LTO Format)
+        // Does not allow pure numbers or pure letters
+        const plateRegex = /^(?=(.*[A-Z]){2,3})(?=(.*[0-9]){3,5})[A-Z0-9 ]{5,9}$/;
+
+        if (!plateRegex.test(plateRaw.replace(/\s/g, ""))) {
+            const feedback = document.getElementById('kiosk-feedback');
+            feedback.innerText = "❌ INVALID PLATE (Must be Letters + Numbers)";
+            feedback.style.color = "#ff5252";
+            setTimeout(() => feedback.innerText = "", 4000);
+            return;
+        }
+
+        const docRef = doc(db, "active_parking", plateRaw);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const feedback = document.getElementById('kiosk-feedback');
+            feedback.innerText = "⚠️ PLATE ALREADY PARKED!";
+            feedback.style.color = "yellow";
+            setTimeout(() => feedback.innerText = "", 3000);
+            return;
+        }
+
         const now = getSyncedTime();
-        const inTime = new Date(now).toLocaleTimeString(); const dt = new Date(now).toLocaleDateString();
-        await setDoc(doc(db, "active_parking", plate), { plate, entryTime: inTime, rawIn: now, date: dt });
-        await printEntryTicket(plate, inTime, dt);
-        document.getElementById('kiosk-feedback').innerText = "✅ PRINTING...";
+        const inTime = new Date(now).toLocaleTimeString(); 
+        const dt = new Date(now).toLocaleDateString();
+        
+        await setDoc(docRef, { plate: plateRaw, entryTime: inTime, rawIn: now, date: dt });
+        await printEntryTicket(plateRaw, inTime, dt);
+        
+        const feedback = document.getElementById('kiosk-feedback');
+        feedback.innerText = "✅ PRINTING TICKET...";
+        feedback.style.color = "#4caf50";
         document.getElementById('kioskPlate').value = "";
-        setTimeout(() => document.getElementById('kiosk-feedback').innerText = "", 3000);
+        
+        setTimeout(() => feedback.innerText = "", 3000);
     };
 
     window.enterKiosk = () => document.getElementById('kiosk-view').style.display = 'flex';
